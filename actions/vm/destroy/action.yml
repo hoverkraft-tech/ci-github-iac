@@ -20,7 +20,16 @@ runs:
   steps:
     - name: Destroy VM and verify absence
       id: destroy
-      shell: bash
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
+        VM_ACTION_PATH: ${{ github.action_path }}
         VM_DIRECTORY: ${{ inputs.vm }}
-      run: python3 "$GITHUB_ACTION_PATH/../cli.py" destroy
+      with:
+        script: |
+          const { VirtualMachine } = require(`${process.env.VM_ACTION_PATH}/../runtime.cjs`);
+          try {
+            new VirtualMachine(process.env.VM_DIRECTORY).destroy();
+            core.setOutput('removed', 'true');
+          } catch {
+            core.setFailed('VM destruction failed. The runtime directory is retained for recovery.');
+          }

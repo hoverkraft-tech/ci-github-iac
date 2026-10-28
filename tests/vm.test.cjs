@@ -1,0 +1,367 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const childProcess = require("node:child_process");
+const { test } = require("node:test");
+const { VirtualMachine } = require("../actions/vm/runtime.cjs");
+const { GuestAssertions } = require("../actions/vm/assertions.cjs");
+const { localRun } = require("../actions/vm/cli.cjs");
+
+const backend = path.resolve(__dirname, "../actions/vm");
+
+function fixture(t) {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "vm-test-"));
+	const previousDirectory = process.cwd();
+	process.chdir(root);
+	const vm = VirtualMachine.allocate();
+	fs.writeFileSync(
+		path.join(root, "assert.sh"),
+		"test -d /run/systemd/system\n",
+	);
+	t.after(() => {
+		process.chdir(previousDirectory);
+		fs.rmSync(vm.home, { recursive: true, force: true });
+		fs.rmSync(root, { recursive: true, force: true });
+	});
+	return { root, vm };
+}
+
+function runAction(t, operation, inputs) {
+	const outputs = {};
+	const failures = [];
+	const core = {
+		setOutput: (key, value) => {
+			outputs[key] = value;
+		},
+		setFailed: (message) => failures.push(message),
+		info: () => {},
+	};
+	const actionInputs = {
+		...inputs,
+		VM_ACTION_PATH: path.join(backend, operation),
+	};
+	const previous = Object.fromEntries(
+		Object.keys(actionInputs).map((key) => [key, process.env[key]]),
+	);
+	t.after(() => {
+		for (const [key, value] of Object.entries(previous)) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	});
+	Object.assign(process.env, actionInputs);
+	const metadata = fs.readFileSync(
+		path.join(backend, operation, "action.yml"),
+		"utf8",
+	);
+	const script = metadata.split("        script: |\n")[1];
+	assert.ok(script, "The action must have an inline github-script entrypoint");
+	// Execute the actual metadata entrypoint with the helpers github-script injects.
+	const execute = new Function("require", "core", script);
+	execute(require, core);
+	return { outputs, failures };
+}
+
+test("each invocation has a short private runtime", (t) => {
+	const { vm } = fixture(t);
+	const other = VirtualMachine.allocate();
+	t.after(() => other.destroy());
+	assert.notEqual(vm.home, other.home);
+	assert.equal(fs.statSync(vm.home).mode & 0o777, 0o700);
+	assert.ok(
+		Buffer.byteLength(
+			path.join(vm.home, vm.name, "ssh.sock.1234567890123456"),
+		) < 108,
+	);
+});
+
+test("shared, unmanaged and symlinked runtimes are rejected", (t) => {
+	const { root, vm } = fixture(t);
+	for (const directory of ["", root, "/tmp/not-owned"]) {
+		assert.throws(() => new VirtualMachine(directory).destroy());
+	}
+	fs.chmodSync(vm.home, 0o755);
+	assert.throws(() => vm.destroy());
+	fs.rmSync(vm.home, { recursive: true });
+	fs.symlinkSync(path.join(root, "missing"), vm.home);
+	assert.throws(() => vm.destroy());
+	assert.ok(fs.existsSync(path.join(root, "assert.sh")));
+});
+
+test("configuration must be a checkout file", (t) => {
+	const { root } = fixture(t);
+	fs.symlinkSync(
+		path.join(backend, "create/lima.yml"),
+		path.join(root, "external.yml"),
+	);
+	for (const config of ["missing.yml", "../outside.yml", "external.yml", "."]) {
+		assert.throws(() => VirtualMachine.template(config));
+	}
+});
+
+test("create accepts configuration without assertion or report inputs", (t) => {
+	const { root, vm } = fixture(t);
+	const config = path.join(root, "guest.yml");
+	fs.writeFileSync(config, "cpus: 1\n");
+	const command = t.mock.method(vm, "command", () => "");
+	vm.create(VirtualMachine.template("guest.yml"));
+	assert.ok(command.mock.calls[0].arguments[0].includes(config));
+	assert.ok(command.mock.calls[0].arguments[0].includes("--plain"));
+	assert.equal(command.mock.calls[0].arguments[1].timeout, 660000);
+	assert.equal(fs.existsSync(path.join(root, ".reports")), false);
+});
+
+test("repeated creation refuses to reuse or delete a running VM", (t) => {
+	const { vm } = fixture(t);
+	t.mock.method(vm, "exists", () => true);
+	const command = t.mock.method(vm, "command");
+	assert.throws(() => vm.create(VirtualMachine.template("")));
+	assert.equal(command.mock.callCount(), 0);
+});
+
+test("failed creation rolls back its partial guest", (t) => {
+	const { vm } = fixture(t);
+	const presence = [false, true, false];
+	t.mock.method(vm, "exists", () => presence.shift());
+	const command = t.mock.method(vm, "command", (args) => {
+		if (args[0] === "start") throw new Error("synthetic failure");
+		return "";
+	});
+	assert.throws(() => vm.create(VirtualMachine.template("")));
+	assert.deepEqual(command.mock.calls.at(-1).arguments[0], [
+		"delete",
+		"--force",
+		"iac-test",
+	]);
+	assert.equal(fs.existsSync(vm.home), false);
+});
+
+test("failed rollback preserves the recovery directory", (t) => {
+	const { vm } = fixture(t);
+	const presence = [false, true];
+	t.mock.method(vm, "exists", () => presence.shift());
+	t.mock.method(vm, "command", () => {
+		throw new Error("synthetic failure");
+	});
+	assert.throws(() => vm.create(VirtualMachine.template("")));
+	assert.ok(fs.existsSync(vm.home));
+});
+
+test("report paths and deadlines are bounded", (t) => {
+	fixture(t);
+	for (const directory of ["../reports", "/tmp/reports", ".", "*"]) {
+		assert.throws(() => new GuestAssertions("assert.sh", directory));
+	}
+	for (const minutes of ["0", "41", "-1", "1.5", "nan", ""]) {
+		assert.throws(() => new GuestAssertions("assert.sh", ".reports", minutes));
+	}
+});
+
+test("report directory symlinks cannot create files outside the checkout", (t) => {
+	const { root, vm } = fixture(t);
+	fs.symlinkSync(vm.home, path.join(root, "reports"));
+	assert.throws(() => new GuestAssertions("assert.sh", "reports/nested"));
+	assert.equal(fs.existsSync(path.join(vm.home, "nested")), false);
+});
+
+test("invalid test input clears previous success evidence", (t) => {
+	fixture(t);
+	const report = new GuestAssertions("assert.sh").report;
+	fs.writeFileSync(report, "stale evidence");
+	assert.throws(() => new GuestAssertions("assert.sh", ".reports", "invalid"));
+	assert.equal(fs.existsSync(report), false);
+});
+
+test("assertions reach guest stdin with a deadline and leave the VM intact", (t) => {
+	const { vm } = fixture(t);
+	const assertions = new GuestAssertions("assert.sh", ".reports", "3");
+	const command = t.mock.method(vm, "command", () => "");
+	assertions.run(vm);
+	assert.deepEqual(command.mock.calls[0].arguments, [
+		["shell", "--workdir=/tmp", "iac-test", "bash", "-euo", "pipefail", "-s"],
+		{ timeout: 180000, input: "test -d /run/systemd/system\n" },
+	]);
+	assert.equal(command.mock.callCount(), 1);
+	assert.ok(fs.existsSync(vm.home));
+	assert.match(
+		fs.readFileSync(assertions.report, "utf8"),
+		/tests="1" failures="0"/,
+	);
+});
+
+test("failed and timed out assertions produce redacted failure evidence", (t) => {
+	const { vm } = fixture(t);
+	const assertions = new GuestAssertions("assert.sh");
+	for (const error of [
+		new Error("secret-output"),
+		Object.assign(new Error("secret"), { code: "ETIMEDOUT" }),
+	]) {
+		t.mock.method(vm, "command", () => {
+			throw error;
+		});
+		assert.throws(() => assertions.run(vm));
+		const report = fs.readFileSync(assertions.report, "utf8");
+		assert.match(report, /failures="1"/);
+		assert.equal(report.includes("secret"), false);
+		assert.ok(fs.existsSync(vm.home));
+	}
+});
+
+test("invalid scripts fail without guest execution", (t) => {
+	const { root, vm } = fixture(t);
+	fs.writeFileSync(path.join(root, "empty.sh"), " \n");
+	fs.symlinkSync(path.join(backend, "cli.cjs"), path.join(root, "external.sh"));
+	const command = t.mock.method(vm, "command");
+	for (const script of [
+		"",
+		"missing.sh",
+		"empty.sh",
+		"../outside.sh",
+		"external.sh",
+	]) {
+		const assertions = new GuestAssertions(script);
+		assert.throws(() => assertions.run(vm));
+		assert.match(fs.readFileSync(assertions.report, "utf8"), /failures="1"/);
+	}
+	assert.equal(command.mock.callCount(), 0);
+});
+
+test("CLI commands use private Lima home, stdin and a forced timeout", (t) => {
+	const { vm } = fixture(t);
+	const spawn = t.mock.method(childProcess, "spawnSync", () => ({
+		status: 0,
+		stdout: "Running\n",
+	}));
+	assert.equal(vm.command(["list"]), "Running");
+	const [executable, args, options] = spawn.mock.calls[0].arguments;
+	assert.equal(executable, "limactl");
+	assert.deepEqual(args, ["list"]);
+	assert.equal(options.env.LIMA_HOME, vm.home);
+	assert.equal(options.timeout, 120000);
+	assert.equal(options.killSignal, "SIGKILL");
+	assert.equal(options.stdio, "pipe");
+	assert.equal(options.shell, undefined);
+});
+
+test("subprocess failures and timeouts cannot expose raw output", (t) => {
+	const { vm } = fixture(t);
+	const spawn = t.mock.method(childProcess, "spawnSync");
+	for (const result of [
+		{ status: 1, stdout: "private-output", stderr: "private-error" },
+		{ status: null, error: new Error("private-command") },
+	]) {
+		spawn.mock.mockImplementation(() => result);
+		assert.throws(() => vm.command(["list"]), {
+			message: "VM command failed or timed out",
+		});
+	}
+});
+
+test("destruction verifies absence before removing runtime keys", (t) => {
+	const { vm } = fixture(t);
+	const presence = [true, false];
+	t.mock.method(vm, "exists", () => presence.shift());
+	const command = t.mock.method(vm, "command", () => "");
+	vm.destroy();
+	assert.deepEqual(command.mock.calls[0].arguments[0], [
+		"delete",
+		"--force",
+		"iac-test",
+	]);
+	assert.equal(fs.existsSync(vm.home), false);
+	const rerun = childProcess.spawnSync(process.execPath, [
+		path.join(backend, "cli.cjs"),
+		"destroy",
+		"--vm",
+		vm.home,
+	]);
+	assert.equal(rerun.status, 0, rerun.stderr?.toString());
+});
+
+test("a guest surviving deletion preserves recovery access and fails", (t) => {
+	const { vm } = fixture(t);
+	t.mock.method(vm, "exists", () => true);
+	t.mock.method(vm, "command", () => "");
+	assert.throws(() => vm.destroy());
+	assert.ok(fs.existsSync(vm.home));
+});
+
+test("an empty runtime can be destroyed without installed Lima", (t) => {
+	const { vm } = fixture(t);
+	const command = t.mock.method(vm, "command");
+	vm.destroy();
+	assert.equal(command.mock.callCount(), 0);
+	assert.equal(fs.existsSync(vm.home), false);
+});
+
+test("local composition attempts cleanup after startup and test failures", (t) => {
+	const { vm } = fixture(t);
+	t.mock.method(VirtualMachine, "allocate", () => vm);
+	t.mock.method(console, "info", () => {});
+	for (const failed of ["create", "test", "destroy"]) {
+		const trace = [];
+		const invoke = (name) => {
+			trace.push(name);
+			if (failed === name) throw new Error("synthetic failure");
+		};
+		t.mock.method(vm, "create", () => invoke("create"));
+		t.mock.method(vm, "destroy", () => invoke("destroy"));
+		assert.throws(() =>
+			localRun(VirtualMachine.template(""), { run: () => invoke("test") }),
+		);
+		assert.equal(trace.at(-1), "destroy");
+		assert.equal(trace.includes("test"), failed !== "create");
+	}
+});
+
+test("creation action exports recovery outputs before failed startup", (t) => {
+	const { vm } = fixture(t);
+	t.mock.method(VirtualMachine, "allocate", () => vm);
+	t.mock.method(vm, "command", () => {
+		throw new Error("secret-output");
+	});
+	const { outputs, failures } = runAction(t, "create", { VM_CONFIG: "" });
+	assert.equal(outputs.vm, vm.home);
+	assert.equal(outputs.id, path.basename(vm.home));
+	assert.equal(failures.length, 1);
+	assert.equal(failures[0].includes("secret"), false);
+	assert.equal(fs.existsSync(vm.home), false);
+});
+
+test("test action exports a failed report while preserving the guest", (t) => {
+	const { root, vm } = fixture(t);
+	t.mock.method(VirtualMachine.prototype, "command", () => {
+		throw new Error("secret-command");
+	});
+	const { outputs, failures } = runAction(t, "test", {
+		VM_DIRECTORY: vm.home,
+		TEST_SCRIPT: "assert.sh",
+		REPORT_DIRECTORY: ".reports",
+		TEST_TIMEOUT_MINUTES: "1",
+	});
+	assert.equal(outputs.report, path.join(root, ".reports/e2e.junit.xml"));
+	assert.equal(failures.length, 1);
+	assert.equal(failures[0].includes("secret"), false);
+	assert.match(fs.readFileSync(outputs.report, "utf8"), /failures="1"/);
+	assert.ok(fs.existsSync(vm.home));
+});
+
+test("destruction action exports removal only after verified cleanup", (t) => {
+	const { vm } = fixture(t);
+	const presence = t.mock.method(
+		VirtualMachine.prototype,
+		"exists",
+		() => true,
+	);
+	t.mock.method(VirtualMachine.prototype, "command", () => "");
+	const failed = runAction(t, "destroy", { VM_DIRECTORY: vm.home });
+	assert.equal(failed.outputs.removed, undefined);
+	assert.equal(failed.failures.length, 1);
+	assert.ok(fs.existsSync(vm.home));
+	presence.mock.mockImplementation(() => false);
+	const success = runAction(t, "destroy", { VM_DIRECTORY: vm.home });
+	assert.equal(success.outputs.removed, "true");
+	assert.deepEqual(success.failures, []);
+	assert.equal(fs.existsSync(vm.home), false);
+});

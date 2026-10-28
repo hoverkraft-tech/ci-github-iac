@@ -8,7 +8,9 @@ Compose three actions in your CI job:
 | [vm/test](../../actions/vm/test/README.md)       | Run guest assertions and write their JUnit result | `report` file path, including on assertion failure |
 | [vm/destroy](../../actions/vm/destroy/README.md) | Delete the guest and verify cleanup               | `removed: true` after successful cleanup           |
 
-Use an ephemeral Linux x86-64 runner with KVM, Python 3.10+ and `contents: read`.
+Use an ephemeral Linux x86-64 runner with KVM and `contents: read`.
+The actions use the Node runtime provided by `actions/github-script`; no Python
+or npm installation is needed on the runner.
 Check out your repository with `persist-credentials: false`. Reserve a 90-minute
 job timeout for installation, startup, assertions and cleanup. Pin all three
 actions to the same reviewed full commit SHA. No consumer Makefile is required.
@@ -79,16 +81,17 @@ Each creation allocates a fresh private `/tmp/iac-<uid>-<random>` Lima directory
 Destruction verifies guest absence, then removes that directory and its SSH keys.
 Cleanup failure fails the step and retains the runtime for recovery. No report
 file is needed to destroy a guest. Startup has an 11-minute subprocess deadline;
-deletion and verification use bounded two-minute CLI calls. Forced runner
+deletion and verification use bounded two-minute CLI calls. CLI output is captured
+with a 1 MiB limit per stream; exceeding it fails the operation. Forced runner
 termination can interrupt cleanup; ephemeral runner disposal bounds remaining
 local resources. Persistent runners and cloud resource cleanup are outside scope.
 
-For local validation, install Lima, QEMU and Python 3.10+ on Linux x86-64 with
+For local validation, install Lima, QEMU and Node.js 24 on Linux x86-64 with
 access to `/dev/kvm` and outbound network access. Lima's version is maintained in
 [creation metadata](../../actions/vm/create/action.yml). From a consumer checkout:
 
 ```sh
-python3 /path/to/ci-github-iac/actions/vm/cli.py run --test-script tests/e2e.sh
+node /path/to/ci-github-iac/actions/vm/cli.cjs run --test-script tests/e2e.sh
 ```
 
 This local command composes the same implementations with guaranteed cleanup
@@ -96,7 +99,7 @@ attempts. Options are `--vm-config`, `--report-directory` and
 `--test-timeout-minutes`. To retry failed cleanup, use the printed runtime path:
 
 ```sh
-python3 /path/to/ci-github-iac/actions/vm/cli.py destroy --vm /tmp/iac-USER-RUN
+node /path/to/ci-github-iac/actions/vm/cli.cjs destroy --vm /tmp/iac-USER-RUN
 ```
 
 Repeated destruction succeeds after removal. In this repository, `make e2e`

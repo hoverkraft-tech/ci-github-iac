@@ -43,8 +43,8 @@ jobs:
       - name: Require all checks
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          assert all(job['result'] == 'success' for job in json.loads(os.environ['RESULTS']).values())
-          PY
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const results = Object.values(JSON.parse(process.env.RESULTS));
+            if (!results.every(job => job.result === 'success')) core.setFailed('A required check did not succeed');

@@ -35,3 +35,8 @@ failure cannot prevent deletion. Failed deletion retains the runtime for retry.
 The accepted direct-consumption decision remains: no forwarding workflow is
 reintroduced. Shared unit contracts and hosted composition tests cover success,
 assertion failure, startup rollback, output handoff and explicit destruction.
+
+## Runtime implementation
+
+[ADR 0005](0005-native-action-scripting.md) supersedes the Python implementation choice.
+The action responsibilities and workflow composition remain as decided here.

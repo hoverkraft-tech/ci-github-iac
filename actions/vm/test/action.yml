@@ -29,10 +29,24 @@ runs:
   steps:
     - name: Execute guest assertions
       id: test
-      shell: bash
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
+        VM_ACTION_PATH: ${{ github.action_path }}
         VM_DIRECTORY: ${{ inputs.vm }}
         TEST_SCRIPT: ${{ inputs.test-script }}
         REPORT_DIRECTORY: ${{ inputs.report-directory }}
         TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
-      run: python3 "$GITHUB_ACTION_PATH/../cli.py" test
+      with:
+        script: |
+          const { VirtualMachine } = require(`${process.env.VM_ACTION_PATH}/../runtime.cjs`);
+          const { GuestAssertions } = require(`${process.env.VM_ACTION_PATH}/../assertions.cjs`);
+          try {
+            const assertions = new GuestAssertions(process.env.TEST_SCRIPT, process.env.REPORT_DIRECTORY, process.env.TEST_TIMEOUT_MINUTES);
+            try {
+              assertions.run(new VirtualMachine(process.env.VM_DIRECTORY));
+            } finally {
+              if (require('node:fs').existsSync(assertions.report)) core.setOutput('report', assertions.report);
+            }
+          } catch {
+            core.setFailed('VM assertions failed. Inspect the sanitized JUnit report when available.');
+          }

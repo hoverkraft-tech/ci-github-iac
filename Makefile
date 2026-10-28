@@ -9,7 +9,7 @@ help: ## Display help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 test: ## Run unit tests
-	python3 -m unittest discover -s tests -v
+	node --test tests/*.test.cjs
 
 lint: ## Execute linting
 	$(call run_linter,)
@@ -24,9 +24,6 @@ lint-fix: ## Execute linting and fix
 		-e FIX_YAML_PRETTIER=true \
 		-e FIX_NATURAL_LANGUAGE=true \
 		-e FIX_SHELL_SHFMT=true \
-		-e FIX_PYTHON_ISORT=true \
-		-e FIX_PYTHON_RUFF=true \
-		-e FIX_PYTHON_RUFF_FORMAT=true \
 	)
 
 ci: ## Execute local CI tasks
@@ -37,7 +34,7 @@ docs: ## Generate action documentation
 	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/vm/create/action.yml actions/vm/test/action.yml actions/vm/destroy/action.yml --repository git
 
 e2e: ## Run guest assertions with automatic VM setup and cleanup
-	python3 actions/vm/cli.py run --test-script tests/fixture/assert.sh
+	node actions/vm/cli.cjs run --test-script tests/fixture/assert.sh
 
 #############################
 # Helpers

@@ -76,23 +76,24 @@ jobs:
           REMOVED: ${{ steps.destroy.outputs.removed }}
           VM_DIRECTORY: ${{ steps.vm.outputs.vm }}
           REPORT: ${{ steps.test.outputs.report }}
-        run: |
-          python3 - <<'PYTHON'
-          import os
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          assert os.environ['CREATE_OUTCOME'] == os.environ['EXPECTED_CREATE']
-          assert os.environ['TEST_OUTCOME'] == os.environ['EXPECTED_TEST']
-          assert os.environ['REMOVED'] == 'true'
-          assert os.environ['VM_DIRECTORY']
-          assert not Path(os.environ['VM_DIRECTORY']).exists()
-          assert not Path('Makefile').exists()
-          if os.environ['EXPECTED_TEST'] == 'skipped':
-              assert not os.environ['REPORT']
-              assert not Path('.reports/e2e.junit.xml').exists()
-          else:
-              report = Path(os.environ['REPORT']).read_text()
-              failures = '1' if os.environ['EXPECTED_TEST'] == 'failure' else '0'
-              assert ET.fromstring(report).get('failures') == failures
-              assert 'synthetic-private-output' not in report
-          PYTHON
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            const env = process.env;
+            assert.equal(env.CREATE_OUTCOME, env.EXPECTED_CREATE);
+            assert.equal(env.TEST_OUTCOME, env.EXPECTED_TEST);
+            assert.equal(env.REMOVED, 'true');
+            assert.ok(env.VM_DIRECTORY);
+            assert.equal(fs.existsSync(env.VM_DIRECTORY), false);
+            assert.equal(fs.existsSync('Makefile'), false);
+            if (env.EXPECTED_TEST === 'skipped') {
+              assert.equal(env.REPORT, '');
+              assert.equal(fs.existsSync('.reports/e2e.junit.xml'), false);
+            } else {
+              const report = fs.readFileSync(env.REPORT, 'utf8');
+              const failures = env.EXPECTED_TEST === 'failure' ? '1' : '0';
+              assert.ok(report.includes(`failures="${failures}"`));
+              assert.equal(report.includes('synthetic-private-output'), false);
+            }
