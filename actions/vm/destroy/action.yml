@@ -25,11 +25,4 @@ runs:
         VM_ACTION_PATH: ${{ github.action_path }}
         VM_DIRECTORY: ${{ inputs.vm }}
       with:
-        script: |
-          const { VirtualMachine } = require(`${process.env.VM_ACTION_PATH}/../runtime.cjs`);
-          try {
-            new VirtualMachine(process.env.VM_DIRECTORY).destroy();
-            core.setOutput('removed', 'true');
-          } catch {
-            core.setFailed('VM destruction failed. The runtime directory is retained for recovery.');
-          }
+        script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });

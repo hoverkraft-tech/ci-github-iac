@@ -7,7 +7,9 @@ Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/
 - Keep environment scenarios in consumers. This repository owns reusable validation
   and focused disposable VM operations; workflows own orchestration and publication, while OCI publication remains in ci-github-container.
 - Use `actions/github-script` for action logic and native Actions helpers for outputs
-  and failures. Share JavaScript modules with local validation; avoid Python helpers.
+  and failures. Put each action entrypoint in `index.cjs` beside its `action.yml`;
+  keep only the module-loading call in YAML. Share JavaScript modules with local
+  validation; avoid Python helpers.
 - Use synthetic fixtures without account credentials. Never upload VM disks, state,
   environment dumps, private keys or unsanitized logs.
 - Preserve cleanup after startup, assertion and report-generation failures. Never turn a

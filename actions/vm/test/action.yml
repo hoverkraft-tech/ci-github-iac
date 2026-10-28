@@ -37,16 +37,4 @@ runs:
         REPORT_DIRECTORY: ${{ inputs.report-directory }}
         TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
       with:
-        script: |
-          const { VirtualMachine } = require(`${process.env.VM_ACTION_PATH}/../runtime.cjs`);
-          const { GuestAssertions } = require(`${process.env.VM_ACTION_PATH}/../assertions.cjs`);
-          try {
-            const assertions = new GuestAssertions(process.env.TEST_SCRIPT, process.env.REPORT_DIRECTORY, process.env.TEST_TIMEOUT_MINUTES);
-            try {
-              assertions.run(new VirtualMachine(process.env.VM_DIRECTORY));
-            } finally {
-              if (require('node:fs').existsSync(assertions.report)) core.setOutput('report', assertions.report);
-            }
-          } catch {
-            core.setFailed('VM assertions failed. Inspect the sanitized JUnit report when available.');
-          }
+        script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });

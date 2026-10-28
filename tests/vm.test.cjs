@@ -37,10 +37,7 @@ function runAction(t, operation, inputs) {
 		setFailed: (message) => failures.push(message),
 		info: () => {},
 	};
-	const actionInputs = {
-		...inputs,
-		VM_ACTION_PATH: path.join(backend, operation),
-	};
+	const actionInputs = inputs;
 	const previous = Object.fromEntries(
 		Object.keys(actionInputs).map((key) => [key, process.env[key]]),
 	);
@@ -51,15 +48,8 @@ function runAction(t, operation, inputs) {
 		}
 	});
 	Object.assign(process.env, actionInputs);
-	const metadata = fs.readFileSync(
-		path.join(backend, operation, "action.yml"),
-		"utf8",
-	);
-	const script = metadata.split("        script: |\n")[1];
-	assert.ok(script, "The action must have an inline github-script entrypoint");
-	// Execute the actual metadata entrypoint with the helpers github-script injects.
-	const execute = new Function("require", "core", script);
-	execute(require, core);
+	const execute = require(path.join(backend, operation, "index.cjs"));
+	execute({ core });
 	return { outputs, failures };
 }
 

@@ -73,6 +73,8 @@ the generated reference. Author usage guidance under docs/usage.
 
 Use the pinned `actions/github-script` runtime and its injected `core` helpers
 for action inputs, outputs and failures. Pass inputs through step environment
-variables. Resolve shared modules from `github.action_path`, so a consumer checkout
-cannot replace the implementation. Keep those modules executable with Node.js 24
+variables. Keep each action entrypoint in `index.cjs` beside its `action.yml`.
+The YAML script only loads that file from `github.action_path` and passes `core`.
+Use relative imports inside the entrypoint for shared VM modules, so a consumer
+checkout cannot replace the implementation. Keep those modules executable with Node.js 24
 for local validation; no package installation or build is required.
