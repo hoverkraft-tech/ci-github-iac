@@ -28,3 +28,16 @@ jobs:
       statuses: write
   vm:
     uses: $/.github/workflows/vm-e2e.yml
+  checks:
+    if: ${{ always() }}
+    needs: [tests, linter, vm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all checks
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          assert all(job['result'] == 'success' for job in json.loads(os.environ['RESULTS']).values())
+          PY

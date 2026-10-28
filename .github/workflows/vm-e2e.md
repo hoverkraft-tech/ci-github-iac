@@ -35,7 +35,7 @@ on:
 permissions: {}
 jobs:
   vm-e2e:
-    uses: hoverkraft-tech/ci-github-iac/.github/workflows/vm-e2e.yml@24e2d4be36936c6b6be9c34dce4c5b2e42e744e1 # feat/phase-1-bootstrap
+    uses: hoverkraft-tech/ci-github-iac/.github/workflows/vm-e2e.yml@8c2bf28f5cca8dc97f05bd36dbb557de5f92e55a # feat/phase-1-bootstrap
     permissions:
       contents: read
     with:
@@ -43,7 +43,7 @@ jobs:
       # Default: `.`
       working-directory: .
 
-      # Sanitized report directory relative to the checkout; no VM disks or raw logs.
+      # Directory containing sanitized *.junit.xml and vm.json reports, relative to the checkout.
       # Default: `.reports`
       artifact-path: .reports
 
@@ -59,11 +59,11 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**                  | **Description**                                                               | **Required** | **Type**   | **Default** |
-| -------------------------- | ----------------------------------------------------------------------------- | ------------ | ---------- | ----------- |
-| **`working-directory`**    | Directory containing the consumer Makefile.                                   | **false**    | **string** | `.`         |
-| **`artifact-path`**        | Sanitized report directory relative to the checkout; no VM disks or raw logs. | **false**    | **string** | `.reports`  |
-| **`test-timeout-minutes`** | Assertion time limit; cleanup has a separate time allowance.                  | **false**    | **number** | `10`        |
+| **Input**                  | **Description**                                                                           | **Required** | **Type**   | **Default** |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ------------ | ---------- | ----------- |
+| **`working-directory`**    | Directory containing the consumer Makefile.                                               | **false**    | **string** | `.`         |
+| **`artifact-path`**        | Directory containing sanitized *.junit.xml and vm.json reports, relative to the checkout. | **false**    | **string** | `.reports`  |
+| **`test-timeout-minutes`** | Assertion time limit; cleanup has a separate time allowance.                              | **false**    | **number** | `10`        |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
