@@ -27,6 +27,20 @@ function fixture(t) {
 	return { root, vm, reports: path.join(root, ".reports") };
 }
 
+function completedTest(t) {
+	const environment = fixture(t);
+	const command = t.mock.method(environment.vm, "command", () => "");
+	const assertions = new GuestAssertions("assert.sh", environment.reports);
+	assertions.run(environment.vm);
+	return {
+		...environment,
+		command,
+		assertions,
+		report: assertions.report,
+		content: fs.readFileSync(assertions.report, "utf8"),
+	};
+}
+
 function runAction(t, operation, inputs) {
 	const outputs = {};
 	const failures = [];
@@ -167,15 +181,11 @@ test("local report destinations cannot escape the checkout", (t) => {
 });
 
 test("invalid settings preserve earlier reports without creating files", (t) => {
-	const { vm, reports } = fixture(t);
-	t.mock.method(vm, "command", () => "");
-	const previous = new GuestAssertions("assert.sh", reports);
-	previous.run(vm);
-	const content = fs.readFileSync(previous.report, "utf8");
+	const { reports, report, content } = completedTest(t);
 	const directories = fs.readdirSync(reports);
 	assert.throws(() => new GuestAssertions("assert.sh", reports, "invalid"));
 	assert.deepEqual(fs.readdirSync(reports), directories);
-	assert.equal(fs.readFileSync(previous.report, "utf8"), content);
+	assert.equal(fs.readFileSync(report, "utf8"), content);
 });
 
 test("assertions reach guest stdin with a deadline and leave the VM intact", (t) => {
@@ -233,18 +243,13 @@ test("invalid scripts fail without guest execution", (t) => {
 });
 
 test("repeated tests on one guest preserve each report", (t) => {
-	const { vm, reports } = fixture(t);
-	const command = t.mock.method(vm, "command", () => "");
-	const assertions = new GuestAssertions("assert.sh", reports);
-	assertions.run(vm);
-	const first = assertions.report;
-	const content = fs.readFileSync(first, "utf8");
+	const { vm, command, assertions, report, content } = completedTest(t);
 	command.mock.mockImplementation(() => {
 		throw new Error("synthetic failure");
 	});
 	assert.throws(() => assertions.run(vm));
-	assert.notEqual(assertions.report, first);
-	assert.equal(fs.readFileSync(first, "utf8"), content);
+	assert.notEqual(assertions.report, report);
+	assert.equal(fs.readFileSync(report, "utf8"), content);
 	assert.match(fs.readFileSync(assertions.report, "utf8"), /failures="1"/);
 	assert.equal(
 		fs.statSync(path.dirname(assertions.report)).mode & 0o777,
@@ -253,12 +258,7 @@ test("repeated tests on one guest preserve each report", (t) => {
 });
 
 test("failed report writes expose no partial or previous report", (t) => {
-	const { vm, reports } = fixture(t);
-	t.mock.method(vm, "command", () => "");
-	const assertions = new GuestAssertions("assert.sh", reports);
-	assertions.run(vm);
-	const first = assertions.report;
-	const content = fs.readFileSync(first, "utf8");
+	const { vm, reports, assertions, report, content } = completedTest(t);
 	const directories = fs.readdirSync(reports);
 	const write = fs.writeFileSync;
 	t.mock.method(fs, "writeFileSync", (filename) => {
@@ -268,7 +268,7 @@ test("failed report writes expose no partial or previous report", (t) => {
 	assert.throws(() => assertions.run(vm));
 	assert.equal(assertions.report, undefined);
 	assert.deepEqual(fs.readdirSync(reports), directories);
-	assert.equal(fs.readFileSync(first, "utf8"), content);
+	assert.equal(fs.readFileSync(report, "utf8"), content);
 });
 
 test("CLI commands use private Lima home, stdin and a forced timeout", (t) => {

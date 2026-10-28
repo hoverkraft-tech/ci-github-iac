@@ -25,7 +25,7 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@0414bf0f10745f4da1fd1b907768656c7a45b3e7 # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@2f8dad1af867ca505901e833a78e23aa182ded8b # feat/phase-1-bootstrap
   with:
     # Private runtime directory returned by vm/create.
     # This input is required.
@@ -34,10 +34,6 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
     # Nonempty Bash script in the checkout to execute inside the guest.
     # This input is required.
     test-script: ""
-
-    # Relative directory for the generated e2e.junit.xml report.
-    # Default: `.reports`
-    report-directory: .reports
 
     # Guest script timeout, from 1 to 40 minutes.
     # Default: `10`
@@ -53,7 +49,6 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 | -------------------------- | ----------------------------------------------------------------- | ------------ | ----------- |
 | **`vm`**                   | Private runtime directory returned by vm/create.                  | **true**     | -           |
 | **`test-script`**          | Nonempty Bash script in the checkout to execute inside the guest. | **true**     | -           |
-| **`report-directory`**     | Relative directory for the generated e2e.junit.xml report.        | **false**    | `.reports`  |
 | **`test-timeout-minutes`** | Guest script timeout, from 1 to 40 minutes.                       | **false**    | `10`        |
 
 <!-- inputs:end -->
@@ -63,9 +58,9 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 
 ## Outputs
 
-| **Output**   | **Description**                                                              |
-| ------------ | ---------------------------------------------------------------------------- |
-| **`report`** | Absolute path of the generated JUnit report, including on assertion failure. |
+| **Output**   | **Description**                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| **`report`** | Absolute path of this invocation's completed JUnit report in runner temp, including on assertion failure. |
 
 <!-- outputs:end -->
 <!-- examples:start -->
