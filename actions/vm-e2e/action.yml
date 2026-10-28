@@ -1,0 +1,70 @@
+# Run a consumer Bash script inside a disposable Lima VM. The action owns setup,
+# reports and verified cleanup, including after startup or assertion failures.
+# See [the usage guide](../../docs/usage/vm-e2e.md) for configuration and local runs.
+---
+name: Disposable VM validation
+description: Create a Lima VM, execute guest assertions, publish sanitized reports and destroy the VM.
+author: Hoverkraft
+branding:
+  icon: server
+  color: purple
+inputs:
+  test-script:
+    description: Bash script in the checkout to execute inside the guest; a nonzero exit fails validation.
+    required: true
+  vm-config:
+    description: Optional Lima YAML file in the checkout; defaults to the bundled pinned Ubuntu image. Plain mode is enforced.
+    default: ""
+  artifact-path:
+    description: Relative directory for generated e2e.junit.xml and vm.json reports.
+    default: .reports
+  test-timeout-minutes:
+    description: Guest script timeout, from 1 to 40 minutes; cleanup has a separate allowance.
+    default: "10"
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs and allocate private runtime
+      id: prepare
+      shell: bash
+      env:
+        VM_INPUTS: ${{ toJSON(inputs) }}
+      run: python3 "$GITHUB_ACTION_PATH/vm.py" prepare
+    - name: Set up Lima and QEMU
+      uses: lima-vm/lima-actions/setup@55627e31b78637bf254a8b2a14da8ea7d12564e5 # v1.1.0
+      with:
+        # renovate: datasource=github-releases depName=lima-vm/lima
+        version: v2.2.1
+    - name: Create disposable VM
+      shell: bash
+      env:
+        VM_CONTEXT: ${{ steps.prepare.outputs.context }}
+      run: python3 "$GITHUB_ACTION_PATH/vm.py" up
+    - name: Execute consumer assertions
+      shell: bash
+      env:
+        VM_CONTEXT: ${{ steps.prepare.outputs.context }}
+      run: python3 "$GITHUB_ACTION_PATH/vm.py" test
+    - name: Collect sanitized diagnostics
+      if: ${{ always() && steps.prepare.outcome == 'success' }}
+      shell: bash
+      env:
+        VM_CONTEXT: ${{ steps.prepare.outputs.context }}
+      run: python3 "$GITHUB_ACTION_PATH/vm.py" collect
+    - name: Destroy disposable VM and verify cleanup
+      if: ${{ always() && steps.prepare.outcome == 'success' }}
+      shell: bash
+      env:
+        VM_CONTEXT: ${{ steps.prepare.outputs.context }}
+      run: python3 "$GITHUB_ACTION_PATH/vm.py" down
+    - name: Upload sanitized reports
+      if: ${{ always() && steps.prepare.outcome == 'success' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: vm-e2e-${{ github.job }}-${{ steps.prepare.outputs.id }}
+        path: |
+          ${{ inputs.artifact-path }}/e2e.junit.xml
+          ${{ inputs.artifact-path }}/vm.json
+        include-hidden-files: true
+        if-no-files-found: error
+        retention-days: 7

@@ -3,6 +3,7 @@
 Date: 2026-10-28
 
 Status: Proposed; workstation migration requires behavior-parity evidence.
+The four-target interface is superseded by [ADR 0002](0002-action-owned-vm-lifecycle.md).
 
 ## Evidence
 

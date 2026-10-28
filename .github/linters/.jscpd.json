@@ -1,0 +1,11 @@
+{
+	"threshold": 0,
+	"reporters": ["consoleFull"],
+	"ignore": [
+		"**/__snapshots__/**",
+		"**/node_modules/**",
+		"actions/**/README.md",
+		".github/workflows/*.md"
+	],
+	"absolute": true
+}

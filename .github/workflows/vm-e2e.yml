@@ -1,21 +1,25 @@
-# Boot a disposable Lima VM through the consumer's Make lifecycle. Assertions,
-# diagnostic collection and teardown remain consumer-owned. Only synthetic,
-# explicitly sanitized artifacts may be published from this public workflow.
+# Execute a consumer Bash script in a disposable VM using the shared action at
+# this workflow's revision. Consumers provide assertions and optional Lima YAML;
+# VM installation, startup, sanitized reports and cleanup belong to the action.
 ---
 name: VM end-to-end validation
 on:
   workflow_call:
     inputs:
-      working-directory:
-        description: Directory containing the consumer Makefile.
+      test-script:
+        description: Bash script in the checkout to execute inside the guest.
         type: string
-        default: .
+        required: true
+      vm-config:
+        description: Optional Lima YAML file in the checkout; defaults to the bundled Ubuntu template.
+        type: string
+        default: ""
       artifact-path:
-        description: Directory containing sanitized *.junit.xml and vm.json reports, relative to the checkout.
+        description: Relative directory for generated sanitized reports.
         type: string
         default: .reports
       test-timeout-minutes:
-        description: Assertion time limit; cleanup has a separate time allowance.
+        description: Assertion time limit from 1 to 40 minutes; cleanup has a separate allowance.
         type: number
         default: 10
 permissions: {}
@@ -26,70 +30,15 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    defaults:
-      run:
-        shell: bash
-        working-directory: ${{ inputs.working-directory }}
     steps:
-      - name: Validate time budget
-        working-directory: ${{ github.workspace }}
-        env:
-          TEST_MINUTES: ${{ inputs.test-timeout-minutes }}
-        run: |
-          [[ "$TEST_MINUTES" =~ ^[0-9]+$ ]] && (( TEST_MINUTES >= 1 && TEST_MINUTES <= 40 ))
       - name: Checkout consumer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Set up Lima and QEMU
-        uses: lima-vm/lima-actions/setup@55627e31b78637bf254a8b2a14da8ea7d12564e5 # v1.1.0
+      - name: Validate in disposable VM
+        uses: $/actions/vm-e2e
         with:
-          # renovate: datasource=github-releases depName=lima-vm/lima
-          version: v2.2.1
-      - name: Create disposable VM
-        id: up
-        timeout-minutes: 20
-        run: make e2e-up
-      - name: Assert VM behavior
-        timeout-minutes: ${{ inputs.test-timeout-minutes }}
-        run: make e2e-test
-      - name: Collect sanitized diagnostics
-        if: ${{ always() && steps.up.outcome != 'skipped' }}
-        timeout-minutes: 3
-        run: make e2e-collect
-      - name: Destroy disposable VM
-        if: ${{ always() && steps.up.outcome != 'skipped' }}
-        timeout-minutes: 10
-        run: make e2e-down
-      - name: Require passing assertions
-        env:
-          REPORT_DIRECTORY: ${{ github.workspace }}/${{ inputs.artifact-path }}
-        run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          files = list(Path(os.environ['REPORT_DIRECTORY']).glob('*.junit.xml'))
-          if not files:
-              raise SystemExit('Missing mandatory JUnit assertions')
-          count = 0
-          for report in files:
-              root = ET.parse(report).getroot()
-              cases = list(root.iter('testcase'))
-              if list(root.iter('failure')) or list(root.iter('error')):
-                  raise SystemExit('JUnit contains failed assertions')
-              count += sum(case.find('skipped') is None for case in cases)
-          if count == 0:
-              raise SystemExit('No mandatory assertions executed')
-          PY
-      - name: Upload sanitized reports
-        if: ${{ always() && steps.up.outcome != 'skipped' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: vm-e2e-${{ github.job }}
-          path: |
-            ${{ inputs.artifact-path }}/*.junit.xml
-            ${{ inputs.artifact-path }}/vm.json
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
+          test-script: ${{ inputs.test-script }}
+          vm-config: ${{ inputs.vm-config }}
+          artifact-path: ${{ inputs.artifact-path }}
+          test-timeout-minutes: ${{ inputs.test-timeout-minutes }}

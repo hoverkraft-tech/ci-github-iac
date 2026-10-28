@@ -4,7 +4,7 @@ SHELL := /bin/bash
 HOST_UID := $(shell id -u)
 HOST_GID := $(shell id -g)
 
-.PHONY: help lint-fix ci test lint docs e2e e2e-up e2e-test e2e-collect e2e-down
+.PHONY: help lint-fix ci test lint docs e2e
 help: ## Display help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
@@ -33,25 +33,11 @@ ci: ## Execute local CI tasks
 	$(MAKE) lint-fix
 	$(MAKE) test
 
-docs: ## Generate workflow documentation
-	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source .github/workflows/vm-e2e.yml --repository git
+docs: ## Generate action and workflow documentation
+	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source .github/workflows/vm-e2e.yml --source actions/vm-e2e/action.yml --repository git
 
-e2e: ## Run the disposable VM lifecycle with cleanup
-	@status=0; trap '$(MAKE) e2e-down || status=$$?; exit $$status' EXIT; \
-	$(MAKE) e2e-up && $(MAKE) e2e-test || status=$$?; \
-	$(MAKE) e2e-collect || status=$$?
-
-e2e-up: ## Create the disposable VM
-	python3 tests/fixture/vm.py up
-
-e2e-test: ## Assert VM behavior
-	python3 tests/fixture/vm.py test
-
-e2e-collect: ## Collect sanitized diagnostics
-	python3 tests/fixture/vm.py collect
-
-e2e-down: ## Destroy the disposable VM
-	python3 tests/fixture/vm.py down
+e2e: ## Run guest assertions with automatic VM setup and cleanup
+	python3 actions/vm-e2e/vm.py run --test-script tests/fixture/assert.sh
 
 #############################
 # Helpers
