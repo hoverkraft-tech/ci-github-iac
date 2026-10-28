@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-test "$(. /etc/os-release && printf '%s' "$ID")" = ubuntu
+# The guest supplies its distribution metadata.
+# shellcheck source=/dev/null
+. /etc/os-release
+test "$ID" = ubuntu
 test -d /run/systemd/system
 test ! -e /tmp/iac-fixture
 printf '%s' synthetic >/tmp/iac-fixture

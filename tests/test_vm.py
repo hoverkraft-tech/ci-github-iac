@@ -73,7 +73,11 @@ class VirtualMachineTests(unittest.TestCase):
             {"artifact-path": "/tmp/reports"},
             {"artifact-path": "."},
             {"artifact-path": "*"},
-            *({"test-timeout-minutes": value} for value in (0, 41, -1, 1.5, "nan")),
+            {"test-timeout-minutes": 0},
+            {"test-timeout-minutes": 41},
+            {"test-timeout-minutes": -1},
+            {"test-timeout-minutes": 1.5},
+            {"test-timeout-minutes": "nan"},
         ]
         with patch.object(module.tempfile, "mkdtemp") as allocate:
             for inputs in invalid:
