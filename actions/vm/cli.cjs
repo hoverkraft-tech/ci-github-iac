@@ -11,6 +11,8 @@ function localRun(template, assertions) {
 		assertions.run(vm);
 	} finally {
 		if (assertions.report) console.info(`JUnit report: ${assertions.report}`);
+		for (const file of assertions.reportFiles || [])
+			console.info(`Guest report: ${file}`);
 		vm.destroy();
 	}
 }
@@ -24,6 +26,7 @@ function main() {
 				"vm-config": { type: "string", default: "" },
 				"test-script": { type: "string", default: "" },
 				"report-directory": { type: "string", default: ".reports" },
+				"report-file": { type: "string", default: "" },
 				"test-timeout-minutes": { type: "string", default: "10" },
 			},
 		});
@@ -35,6 +38,7 @@ function main() {
 				values["test-script"],
 				new Workspace().resolve(values["report-directory"]),
 				values["test-timeout-minutes"],
+				values["report-file"],
 			);
 			localRun(VirtualMachine.template(values["vm-config"]), assertions);
 		} else {

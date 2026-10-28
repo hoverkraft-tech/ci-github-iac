@@ -46,12 +46,14 @@ these workflows reach the default branch.
 
 ## Validation
 
-Use Node.js 24 locally. Run `make test` with its built-in test runner for failure,
+Use Node.js 24.8 or later locally. Run `make test` with its built-in test runner for failure,
 cleanup, report and action-output contracts, `make lint` for the
 Hoverkraft containerized linter, and `make e2e` on a KVM-capable host for actual
 VM behavior. PR CI verifies action outputs across successful assertions, failed
 assertions and failed startup, without a consumer Makefile. It repeats tests on
-the same guest to verify independent reports. Local Make composes
+the same guest to verify independent reports, copies JUnit and coverage files
+after assertion failures, and verifies the shared parser's file list and summary.
+Local Make composes
 the same JavaScript resource and assertion components. Do not replace a boot check with mocked CLI output.
 
 ## Releases and dependencies

@@ -14,16 +14,19 @@ jobs:
       matrix:
         include:
           - scenario: success
+            report-file: ""
             script: tests/fixture/assert.sh
             config: ""
             create-outcome: success
             test-outcome: success
           - scenario: assertion-failure
+            report-file: "*.xml"
             script: tests/fixture/fail.sh
             config: ""
             create-outcome: success
             test-outcome: failure
           - scenario: startup-failure
+            report-file: ""
             script: tests/fixture/assert.sh
             config: tests/fixture/unbootable.yml
             create-outcome: failure
@@ -51,6 +54,7 @@ jobs:
           vm: ${{ steps.vm.outputs.vm }}
           test-script: ${{ matrix.script }}
           test-timeout-minutes: 1
+          report-file: ${{ matrix.report-file }}
       - name: Run another test on the same guest
         if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
         id: repeated-test
@@ -60,21 +64,36 @@ jobs:
           vm: ${{ steps.vm.outputs.vm }}
           test-script: tests/fixture/assert.sh
           test-timeout-minutes: 1
+          report-file: "*.xml,coverage/*.info"
       - name: Destroy VM
         if: ${{ always() && steps.vm.outputs.vm != '' }}
         id: destroy
         uses: $/actions/vm/destroy
         with:
           vm: ${{ steps.vm.outputs.vm }}
+      - name: Summarize assertion reports
+        if: >-
+          ${{ always() && (steps.test.outputs.report != '' || steps.test.outputs.report-files != '' || steps.repeated-test.outputs.report != '' || steps.repeated-test.outputs.report-files != '') }}
+        id: reports
+        uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+        with:
+          report-name: VM assertions - ${{ matrix.scenario }}
+          report-paths: |
+            ${{ steps.test.outputs.report-files || steps.test.outputs.report }}
+            ${{ steps.repeated-test.outputs.report-files || steps.repeated-test.outputs.report }}
+          output-format: summary,annotations
+          path-mapping: /guest/project:.
       - name: Upload assertion report
         if: >-
-          ${{ always() && (steps.test.outputs.report != '' || steps.repeated-test.outputs.report != '') }}
+          ${{ always() && (steps.test.outputs.report != '' || steps.test.outputs.report-files != '' || steps.repeated-test.outputs.report != '' || steps.repeated-test.outputs.report-files != '') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: vm-${{ matrix.scenario }}-${{ steps.vm.outputs.id }}
           path: |
             ${{ steps.test.outputs.report }}
             ${{ steps.repeated-test.outputs.report }}
+            ${{ steps.test.outputs.report-files }}
+            ${{ steps.repeated-test.outputs.report-files }}
           if-no-files-found: error
           retention-days: 7
       - name: Verify action handoffs and cleanup
@@ -89,6 +108,11 @@ jobs:
           REPORT: ${{ steps.test.outputs.report }}
           REPEATED_REPORT: ${{ steps.repeated-test.outputs.report }}
           REPEATED_OUTCOME: ${{ steps.repeated-test.outcome }}
+          REPORTS_OUTCOME: ${{ steps.reports.outcome }}
+          PARSED_REPORTS: ${{ steps.reports.outputs.parsed-files }}
+          REPORT_SUMMARY: ${{ steps.reports.outputs.summary }}
+          GUEST_REPORTS: ${{ steps.test.outputs.report-files }}
+          REPEATED_GUEST_REPORTS: ${{ steps.repeated-test.outputs.report-files }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -106,6 +130,10 @@ jobs:
               assert.equal(env.REPORT, '');
               assert.equal(env.REPEATED_REPORT, '');
               assert.equal(env.REPEATED_OUTCOME, 'skipped');
+              assert.equal(env.REPORTS_OUTCOME, 'skipped');
+              assert.equal(env.REPORT_SUMMARY, '');
+              assert.equal(env.GUEST_REPORTS, '');
+              assert.equal(env.REPEATED_GUEST_REPORTS, '');
             } else {
               assert.equal(env.REPEATED_OUTCOME, 'success');
               assert.notEqual(env.REPORT, env.REPEATED_REPORT);
@@ -117,5 +145,22 @@ jobs:
               assert.ok(report.includes(`failures="${failures}"`));
               assert.equal(report.includes('synthetic-private-output'), false);
               assert.match(fs.readFileSync(env.REPEATED_REPORT, 'utf8'), /failures="0"/);
+              assert.equal(env.REPORTS_OUTCOME, 'success');
+              const guestReports = env.GUEST_REPORTS.split('\n').filter(Boolean);
+              const repeatedReports = env.REPEATED_GUEST_REPORTS.split('\n').filter(Boolean);
+              assert.equal(guestReports.length, failures === '1' ? 1 : 0);
+              assert.equal(repeatedReports.length, 2);
+              for (const filename of [...guestReports, ...repeatedReports]) {
+                assert.equal(fs.readFileSync(filename, 'utf8').includes('synthetic-private-output'), false);
+              }
+              assert.deepEqual(
+                JSON.parse(env.PARSED_REPORTS).sort(),
+                [...(guestReports.length ? guestReports : [env.REPORT]), ...repeatedReports].sort()
+              );
+              assert.ok(env.REPORT_SUMMARY.includes('| **Total** | **2** |'));
+              assert.ok(env.REPORT_SUMMARY.includes(`| ❌ Failed | ${failures} |`));
+              assert.equal(env.REPORT_SUMMARY.includes('synthetic-private-output'), false);
+              assert.ok(env.REPORT_SUMMARY.includes('### Coverage Report'));
+              assert.equal(env.REPORT_SUMMARY.includes('/guest/project'), false);
             }
             assert.equal(fs.existsSync('.reports'), false);

@@ -1,8 +1,8 @@
-# Execute assertions against an existing guest and write a sanitized JUnit report.
+# Execute assertions, collect selected guest reports and write command-status JUnit.
 # See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ---
 name: VM - Test
-description: Run a Bash assertion script in an existing Lima VM and report its result.
+description: Run guest assertions and collect test reports for Hoverkraft CI reporting.
 author: Hoverkraft
 branding:
   icon: check-circle
@@ -17,10 +17,20 @@ inputs:
   test-timeout-minutes:
     description: Guest script timeout, from 1 to 40 minutes.
     default: "10"
+  report-file:
+    description: |
+      Optional report paths or glob patterns relative to the guest REPORTS_DIR.
+      Separate patterns with newlines, commas or semicolons. Every pattern must match.
+      The script receives a fresh REPORTS_DIR; matched files are collected even after test failure.
+      Report contents are preserved. Use only reports suitable for public CI.
+    default: ""
 outputs:
   report:
-    description: Absolute path of this invocation's completed JUnit report in runner temp, including on assertion failure.
+    description: Absolute path of the sanitized command-status JUnit report, including on assertion or collection failure.
     value: ${{ steps.test.outputs.report }}
+  report-files:
+    description: Newline-separated absolute paths of completed guest report files. Empty when collection is disabled or fails.
+    value: ${{ steps.test.outputs.report-files }}
 runs:
   using: composite
   steps:
@@ -32,5 +42,6 @@ runs:
         VM_DIRECTORY: ${{ inputs.vm }}
         TEST_SCRIPT: ${{ inputs.test-script }}
         TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+        REPORT_FILE: ${{ inputs.report-file }}
       with:
         script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });
