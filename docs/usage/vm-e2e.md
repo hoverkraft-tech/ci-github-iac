@@ -2,11 +2,11 @@
 
 Compose three actions in your CI job:
 
-| Action | Responsibility | Handoff |
-| --- | --- | --- |
-| [vm/create](../../actions/vm/create/README.md) | Install Lima and create an isolated guest | `vm` runtime directory and unique `id` |
-| [vm/test](../../actions/vm/test/README.md) | Run guest assertions and write their JUnit result | `report` file path, including on assertion failure |
-| [vm/destroy](../../actions/vm/destroy/README.md) | Delete the guest and verify cleanup | `removed: true` after successful cleanup |
+| Action                                           | Responsibility                                    | Handoff                                            |
+| ------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------- |
+| [vm/create](../../actions/vm/create/README.md)   | Install Lima and create an isolated guest         | `vm` runtime directory and unique `id`             |
+| [vm/test](../../actions/vm/test/README.md)       | Run guest assertions and write their JUnit result | `report` file path, including on assertion failure |
+| [vm/destroy](../../actions/vm/destroy/README.md) | Delete the guest and verify cleanup               | `removed: true` after successful cleanup           |
 
 Use an ephemeral Linux x86-64 runner with KVM, Python 3.10+ and `contents: read`.
 Check out your repository with `persist-credentials: false`. Reserve a 90-minute
@@ -17,6 +17,8 @@ The [internal VM tests](../../.github/workflows/__test-actions-vm.yml) show comp
 composition and failure assertions. A consumer job uses this sequence after checkout:
 
 ```yaml
+# This example intentionally matches the maintained workflow.
+# jscpd:ignore-start
 - name: Create VM
   id: vm
   uses: hoverkraft-tech/ci-github-iac/actions/vm/create@<reviewed-full-commit-sha>
@@ -40,6 +42,7 @@ composition and failure assertions. A consumer job uses this sequence after chec
     include-hidden-files: true
     if-no-files-found: error
     retention-days: 7
+# jscpd:ignore-end
 ```
 
 Keep the `always()` cleanup condition and do not suppress cleanup failures.

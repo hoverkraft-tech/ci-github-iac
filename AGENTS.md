@@ -8,7 +8,7 @@ Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/
   and focused disposable VM operations; workflows own orchestration and publication, while OCI publication remains in ci-github-container.
 - Use synthetic fixtures without account credentials. Never upload VM disks, state,
   environment dumps, private keys or unsanitized logs.
-- Preserve cleanup after startup, assertion and collection failures. Never turn a
+- Preserve cleanup after startup, assertion and report-generation failures. Never turn a
   failed or missing assertion into a successful run.
 - Run `make test` and `make lint` for changes. VM behavior also needs `make e2e` on
   a Linux x86-64 host with KVM, Lima and QEMU.

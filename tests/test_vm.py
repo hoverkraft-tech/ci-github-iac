@@ -1,5 +1,6 @@
 """Exercise independently composable VM actions and their failure contracts."""
 
+import importlib
 import os
 import shutil
 import subprocess
@@ -8,15 +9,17 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, call, patch
 
 BACKEND = Path(__file__).resolve().parents[1] / "actions/vm"
 sys.path.insert(0, str(BACKEND))
-# These modules also run directly from downloaded action directories.
-# pylint: disable=wrong-import-position
-from assertions import GuestAssertions
-from cli import local_run, template_path
-from runtime import VirtualMachine
+# Load the same entrypoints used from downloaded action directories.
+GuestAssertions = importlib.import_module("assertions").GuestAssertions
+VirtualMachine = importlib.import_module("runtime").VirtualMachine
+cli = importlib.import_module("cli")
+local_run = cli.local_run
+template_path = cli.template_path
 
 
 # unittest exposes each independent contract as a public test method.
@@ -37,7 +40,7 @@ class VirtualMachineTests(unittest.TestCase):
         self.addCleanup(working_directory.stop)
         self.vm = self.allocate()
 
-    def allocate(self) -> VirtualMachine:
+    def allocate(self) -> Any:
         """Register test cleanup even when a simulated CLI deletion fails."""
         vm = VirtualMachine.allocate()
         self.addCleanup(shutil.rmtree, vm.home, ignore_errors=True)
