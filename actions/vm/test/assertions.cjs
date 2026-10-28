@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { Workspace } = require("./workspace.cjs");
+const { Workspace } = require("../_internal/workspace.cjs");
 const { GuestReports } = require("./reports.cjs");
 
 class GuestAssertions {

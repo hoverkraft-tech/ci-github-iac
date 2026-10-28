@@ -1,5 +1,5 @@
-const { VirtualMachine } = require("../runtime.cjs");
-const { GuestAssertions } = require("../assertions.cjs");
+const { VirtualMachine } = require("../_internal/runtime.cjs");
+const { GuestAssertions } = require("./assertions.cjs");
 
 module.exports = ({ core }) => {
 	try {

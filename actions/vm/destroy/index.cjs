@@ -1,4 +1,4 @@
-const { VirtualMachine } = require("../runtime.cjs");
+const { VirtualMachine } = require("../_internal/runtime.cjs");
 
 module.exports = ({ core }) => {
 	try {

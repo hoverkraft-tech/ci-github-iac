@@ -6,6 +6,7 @@ Status: Accepted. Supersedes the Python implementation choice in
 [ADR 0004](0004-focused-vm-actions.md); the three action responsibilities remain.
 
 Reporting ownership is superseded by [ADR 0009](0009-test-action-reporting.md).
+Module ownership is refined by [ADR 0010](0010-action-module-ownership.md).
 
 ## Decision
 

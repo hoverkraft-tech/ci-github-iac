@@ -3,8 +3,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { test } = require("node:test");
-const { GuestReports } = require("../actions/vm/reports.cjs");
-const { GuestAssertions } = require("../actions/vm/assertions.cjs");
+const { GuestReports } = require("../actions/vm/test/reports.cjs");
+const { GuestAssertions } = require("../actions/vm/test/assertions.cjs");
 
 function reportFixture(t, selection = "**/*.xml,coverage/*.info") {
 	const directory = fs.mkdtempSync("/tmp/report-test-");

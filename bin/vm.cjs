@@ -1,13 +1,14 @@
 const { parseArgs } = require("node:util");
-const { VirtualMachine } = require("./runtime.cjs");
-const { GuestAssertions } = require("./assertions.cjs");
-const { Workspace } = require("./workspace.cjs");
+const { VirtualMachine } = require("../actions/vm/_internal/runtime.cjs");
+const { Workspace } = require("../actions/vm/_internal/workspace.cjs");
+const { GuestCreation } = require("../actions/vm/create/creation.cjs");
+const { GuestAssertions } = require("../actions/vm/test/assertions.cjs");
 
-function localRun(template, assertions) {
+function localRun(creation, assertions) {
 	const vm = VirtualMachine.allocate();
 	console.info(`VM recovery directory: ${vm.home}`);
 	try {
-		vm.create(template);
+		creation.start(vm);
 		assertions.run(vm);
 	} finally {
 		if (assertions.report) console.info(`JUnit report: ${assertions.report}`);
@@ -41,7 +42,7 @@ function main() {
 				values["test-timeout-minutes"],
 				values["report-file"],
 			);
-			localRun(VirtualMachine.template(values["vm-config"]), assertions);
+			localRun(new GuestCreation(values["vm-config"]), assertions);
 		} else {
 			throw new Error("Unknown command");
 		}

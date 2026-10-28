@@ -80,6 +80,19 @@ Use the pinned `actions/github-script` runtime and its injected `core` helpers
 for action inputs, outputs and failures. Pass inputs through step environment
 variables. Keep each action entrypoint in `index.cjs` beside its `action.yml`.
 The YAML script only loads that file from `github.action_path` and passes `core`.
-Use relative imports inside the entrypoint for shared VM modules, so a consumer
-checkout cannot replace the implementation. Keep those modules executable with Node.js 24
-for local validation; no package installation or build is required.
+Use relative imports inside the entrypoint, so a consumer checkout cannot replace
+the implementation. Each action owns its operation:
+
+| Location                             | Responsibility                                                                    |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| `actions/vm/create/creation.cjs`     | Validate configuration, start the guest and roll back failed startup.             |
+| `actions/vm/test/assertions.cjs`     | Execute assertions and write the invocation's status report.                      |
+| `actions/vm/test/reports.cjs`        | Collect selected guest reports.                                                   |
+| `actions/vm/_internal/runtime.cjs`   | Run bounded Lima commands, protect private runtime ownership and verify deletion. |
+| `actions/vm/_internal/workspace.cjs` | Resolve checkout paths without allowing escapes.                                  |
+| `bin/vm.cjs`                         | Compose creation, assertions and cleanup for local runs.                          |
+
+Actions share the internal safety primitives; action-specific code stays with its
+owner. Startup rollback and explicit destruction use the same verified cleanup.
+The internal modules are not a public API. Keep modules executable with Node.js 24;
+no package installation or build is required.

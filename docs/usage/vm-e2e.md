@@ -165,7 +165,7 @@ access to `/dev/kvm` and outbound network access. Lima's version is maintained i
 [creation metadata](../../actions/vm/create/action.yml). From a consumer checkout:
 
 ```sh
-node /path/to/ci-github-iac/actions/vm/cli.cjs run --vm-config tests/lima.yml --test-script tests/e2e.sh
+node /path/to/ci-github-iac/bin/vm.cjs run --vm-config tests/lima.yml --test-script tests/e2e.sh
 ```
 
 This local command composes the same implementations with guaranteed cleanup
@@ -178,7 +178,7 @@ Optional arguments are `--report-file`, `--report-directory` (a directory within
 needed. To retry failed cleanup, use the printed runtime path:
 
 ```sh
-node /path/to/ci-github-iac/actions/vm/cli.cjs destroy --vm /tmp/iac-USER-RUN
+node /path/to/ci-github-iac/bin/vm.cjs destroy --vm /tmp/iac-USER-RUN
 ```
 
 Repeated destruction succeeds after removal. In this repository, `make e2e`

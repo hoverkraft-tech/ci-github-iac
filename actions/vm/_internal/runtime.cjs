@@ -1,7 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const childProcess = require("node:child_process");
-const { Workspace } = require("./workspace.cjs");
 
 class VirtualMachine {
 	name = "iac-test";
@@ -13,12 +12,6 @@ class VirtualMachine {
 
 	static allocate() {
 		return new VirtualMachine(fs.mkdtempSync(`/tmp/iac-${process.getuid()}-`));
-	}
-
-	static template(config) {
-		if (typeof config !== "string" || !config.trim())
-			throw new Error("vm-config is required");
-		return new Workspace().file(config);
 	}
 
 	validateRuntime() {
@@ -65,28 +58,6 @@ class VirtualMachine {
 		return this.command(["list", "--format", "{{.Name}}"])
 			.split("\n")
 			.includes(this.name);
-	}
-
-	create(template) {
-		if (this.exists()) throw new Error("This invocation already has a VM");
-		try {
-			this.command(
-				[
-					"start",
-					"--tty=false",
-					"--plain",
-					"--timeout=10m",
-					`--name=${this.name}`,
-					template,
-				],
-				{
-					timeout: 660000,
-				},
-			);
-		} catch (error) {
-			this.destroy();
-			throw error;
-		}
 	}
 
 	destroy() {
