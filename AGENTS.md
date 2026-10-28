@@ -12,7 +12,7 @@ Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/
   keep only the module-loading call in YAML. Keep creation logic under create/ and
   assertions and report collection under test/. Limit _internal/ to Lima commands,
   private runtime ownership, verified cleanup and checkout path validation.
-  Local validation composes these modules through bin/vm.cjs; avoid Python helpers.
+  Local Node.js validation composes these modules through bin/vm.cjs.
 - Use synthetic fixtures without account credentials. Never upload VM disks, state,
   environment dumps, private keys or unsanitized logs.
 - Preserve cleanup after startup, assertion and report-generation failures. Never turn a

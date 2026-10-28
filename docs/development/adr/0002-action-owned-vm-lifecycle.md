@@ -5,6 +5,8 @@ Date: 2026-10-28
 Status: Accepted. Supersedes the four-target interface in
 [ADR 0001](0001-vm-extraction.md); workstation migration gates remain unchanged.
 
+Runtime implementation is superseded by [ADR 0005](0005-native-action-scripting.md).
+
 ## Context
 
 Calling consumer Make targets delegated VM implementation to every repository.

@@ -10,8 +10,8 @@ Compose three actions in your CI job:
 
 Use an ephemeral Linux x86-64 runner with KVM and `contents: read`.
 Default GitHub reporting also needs `pull-requests: write` for PR comments.
-The VM actions use the Node runtime provided by `actions/github-script`; no Python
-or consumer package installation is needed. The shared report parser manages its own dependencies.
+The VM actions use the Node runtime provided by `actions/github-script`.
+The shared report parser manages its own dependencies.
 Check out your repository with `persist-credentials: false`. Reserve a 90-minute
 job timeout for installation, startup, assertions and cleanup. Pin all three
 actions to the same reviewed full commit SHA. No consumer Makefile is required.
