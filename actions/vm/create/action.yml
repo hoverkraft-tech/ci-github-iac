@@ -1,0 +1,34 @@
+# Create a disposable Lima guest and return its private runtime directory.
+# See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
+---
+name: VM - Create
+description: Create an isolated Lima VM, rolling back resources if startup fails.
+author: Hoverkraft
+branding:
+  icon: server
+  color: purple
+inputs:
+  vm-config:
+    description: Optional Lima YAML file in the checkout; defaults to pinned Ubuntu. Plain mode is enforced.
+    default: ""
+outputs:
+  vm:
+    description: Private Lima runtime directory for subsequent VM actions; allocated before startup.
+    value: ${{ steps.create.outputs.vm }}
+  id:
+    description: Unique identifier for this invocation.
+    value: ${{ steps.create.outputs.id }}
+runs:
+  using: composite
+  steps:
+    - name: Set up Lima and QEMU
+      uses: lima-vm/lima-actions/setup@55627e31b78637bf254a8b2a14da8ea7d12564e5 # v1.1.0
+      with:
+        # renovate: datasource=github-releases depName=lima-vm/lima
+        version: v2.2.1
+    - name: Create VM
+      id: create
+      shell: bash
+      env:
+        VM_CONFIG: ${{ inputs.vm-config }}
+      run: python3 "$GITHUB_ACTION_PATH/../cli.py" create

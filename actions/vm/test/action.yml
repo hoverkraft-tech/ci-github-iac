@@ -1,0 +1,38 @@
+# Execute assertions against an existing guest and write a sanitized JUnit report.
+# See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
+---
+name: VM - Test
+description: Run a Bash assertion script in an existing Lima VM and report its result.
+author: Hoverkraft
+branding:
+  icon: check-circle
+  color: purple
+inputs:
+  vm:
+    description: Private runtime directory returned by vm/create.
+    required: true
+  test-script:
+    description: Nonempty Bash script in the checkout to execute inside the guest.
+    required: true
+  report-directory:
+    description: Relative directory for the generated e2e.junit.xml report.
+    default: .reports
+  test-timeout-minutes:
+    description: Guest script timeout, from 1 to 40 minutes.
+    default: "10"
+outputs:
+  report:
+    description: Absolute path of the generated JUnit report, including on assertion failure.
+    value: ${{ steps.test.outputs.report }}
+runs:
+  using: composite
+  steps:
+    - name: Execute guest assertions
+      id: test
+      shell: bash
+      env:
+        VM_DIRECTORY: ${{ inputs.vm }}
+        TEST_SCRIPT: ${{ inputs.test-script }}
+        REPORT_DIRECTORY: ${{ inputs.report-directory }}
+        TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+      run: python3 "$GITHUB_ACTION_PATH/../cli.py" test

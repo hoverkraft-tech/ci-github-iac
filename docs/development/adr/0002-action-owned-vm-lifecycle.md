@@ -44,3 +44,7 @@ References: [GitHub same-repository action references](https://docs.github.com/e
 
 [ADR 0003](0003-direct-action-consumption.md) replaces the public workflow wrapper
 with direct action calls. The action-owned lifecycle remains unchanged.
+
+## Responsibility split
+
+The combined action boundary is superseded by [ADR 0004](0004-focused-vm-actions.md).

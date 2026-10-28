@@ -34,7 +34,7 @@ jobs:
   vm:
     permissions:
       contents: read
-    uses: $/.github/workflows/__test-action-vm-e2e.yml
+    uses: $/.github/workflows/__test-actions-vm.yml
   checks:
     if: ${{ always() }}
     needs: [tests, linter, vm]

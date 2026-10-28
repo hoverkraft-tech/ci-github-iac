@@ -1,77 +1,100 @@
 # VM end-to-end tests
 
-Commit a Bash script containing your guest assertions, check out the consumer,
-and call the [shared action](../../actions/vm-e2e/README.md) as a job step:
-`hoverkraft-tech/ci-github-iac/actions/vm-e2e@<reviewed-full-commit-sha>`.
-Set `test-script: tests/e2e.sh`. No Makefile is required in the consumer.
+Compose three actions in your CI job:
+
+| Action | Responsibility | Handoff |
+| --- | --- | --- |
+| [vm/create](../../actions/vm/create/README.md) | Install Lima and create an isolated guest | `vm` runtime directory and unique `id` |
+| [vm/test](../../actions/vm/test/README.md) | Run guest assertions and write their JUnit result | `report` file path, including on assertion failure |
+| [vm/destroy](../../actions/vm/destroy/README.md) | Delete the guest and verify cleanup | `removed: true` after successful cleanup |
 
 Use an ephemeral Linux x86-64 runner with KVM, Python 3.10+ and `contents: read`.
-Set `persist-credentials: false` on checkout and `timeout-minutes: 90` on the VM
-job to reserve time for installation, startup, the chosen test timeout and cleanup.
-The [internal action tests](../../.github/workflows/__test-action-vm-e2e.yml)
-show direct calls for successful and failing guest scripts.
+Check out your repository with `persist-credentials: false`. Reserve a 90-minute
+job timeout for installation, startup, assertions and cleanup. Pin all three
+actions to the same reviewed full commit SHA. No consumer Makefile is required.
+
+The [internal VM tests](../../.github/workflows/__test-actions-vm.yml) show complete
+composition and failure assertions. A consumer job uses this sequence after checkout:
+
+```yaml
+- name: Create VM
+  id: vm
+  uses: hoverkraft-tech/ci-github-iac/actions/vm/create@<reviewed-full-commit-sha>
+- name: Execute guest assertions
+  id: test
+  uses: hoverkraft-tech/ci-github-iac/actions/vm/test@<same-reviewed-full-commit-sha>
+  with:
+    vm: ${{ steps.vm.outputs.vm }}
+    test-script: tests/e2e.sh
+- name: Destroy VM
+  if: ${{ always() && steps.vm.outputs.vm != '' }}
+  uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@<same-reviewed-full-commit-sha>
+  with:
+    vm: ${{ steps.vm.outputs.vm }}
+- name: Upload assertion report
+  if: ${{ always() && steps.test.outputs.report != '' }}
+  uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+  with:
+    name: vm-${{ github.job }}-${{ steps.vm.outputs.id }}
+    path: ${{ steps.test.outputs.report }}
+    include-hidden-files: true
+    if-no-files-found: error
+    retention-days: 7
+```
+
+Keep the `always()` cleanup condition and do not suppress cleanup failures.
+Creation rolls back partial startup itself; explicit destruction also retries
+cleanup when creation has exported its runtime directory. Artifact publication
+runs after destruction, so an upload failure cannot prevent cleanup. The workflow
+owns upload conditions, naming and retention. Do not upload the VM directory.
 
 ## Configure the scenario
 
-`test-script` is required and must name a nonempty file within the checkout.
-The action sends its contents to guest Bash over SSH, with `-euo pipefail`,
-standard input and `/tmp` as the working directory. A zero exit means success;
-a nonzero exit or timeout fails validation. Put your actual assertions in this
-script. Host checkout files and host environment variables are not copied into
-the guest. Scripts must be self-contained or obtain synthetic fixtures themselves.
+`vm/create` accepts an optional `vm-config` YAML file within the checkout.
+The [bundled template](../../actions/vm/create/lima.yml) uses a digest-pinned Ubuntu
+image with 2 CPUs, 2 GiB RAM and a 10 GiB disk. Plain mode disables host mounts,
+SSH agent forwarding and dynamic port forwarding. Lima provisioning still runs;
+treat configuration and scripts as trusted repository code.
 
-`vm-config` optionally selects a Lima YAML file within the checkout. Use it to
-declare the image, resources and guest provisioning scripts. Otherwise the
-[bundled template](../../actions/vm-e2e/lima.yml) selects a digest-pinned Ubuntu
-image with 2 CPUs, 2 GiB RAM and a 10 GiB disk. Plain mode is enforced, disabling
-host mounts, SSH agent forwarding and dynamic port forwarding. Lima provisioning
-still runs; treat configuration and scripts as trusted repository code.
+`vm/test` accepts `vm`, a required `test-script`, `test-timeout-minutes` from 1 to
+40 (default 10), and `report-directory` (default `.reports`). The script must be
+nonempty and inside the checkout. It runs in guest Bash with `-euo pipefail`,
+standard input and `/tmp` as its working directory. Checkout files and host
+environment variables are not copied into the guest. Scripts must be self-contained
+or obtain synthetic fixtures themselves. Nonzero exit and timeout fail the action.
 
-`test-timeout-minutes` accepts integers from 1 to 40, defaulting to 10. Startup
-has a separate 11-minute subprocess deadline; diagnostics and deletion use
-bounded two-minute CLI operations. The shared action attempts collection and
-cleanup even after startup, test or collection failures. Cleanup failure fails
-the action. Forced runner termination can interrupt these attempts; ephemeral
-runner disposal bounds remaining local resources. Cloud resources, credentials,
-persistent self-hosted runners and workstation browser recovery are outside this
-initial action's scope.
+Testing leaves the VM running, allowing additional assertions or diagnostics
+before destruction. Each test call replaces `e2e.junit.xml` in its report directory;
+use different directories when retaining multiple results. The report contains
+one case for the script exit status. Guest output and exception details are
+suppressed in both the report and public logs. Startup failures skip testing and
+do not emit a report; publication uses only the current test action's output.
 
-## Reports and cleanup
+## Cleanup and local runs
 
-`artifact-path` defaults to `.reports` and must be a directory inside the checkout.
-The action generates one JUnit case for the script exit status and a VM status
-record. A successful teardown records `absent` only after verifying deletion.
-The action uploads only `e2e.junit.xml` and `vm.json`, with a unique artifact name
-and seven-day retention. It never copies guest output, VM disks, keys or state
-into these reports. Script output is also suppressed in public action logs.
-Missing or empty scripts fail before VM creation; stale reports are cleared
-before startup. Startup failures do not produce a passing JUnit report.
+Each creation allocates a fresh private `/tmp/iac-<uid>-<random>` Lima directory.
+Destruction verifies guest absence, then removes that directory and its SSH keys.
+Cleanup failure fails the step and retains the runtime for recovery. No report
+file is needed to destroy a guest. Startup has an 11-minute subprocess deadline;
+deletion and verification use bounded two-minute CLI calls. Forced runner
+termination can interrupt cleanup; ephemeral runner disposal bounds remaining
+local resources. Persistent runners and cloud resource cleanup are outside scope.
 
-Every invocation uses a fresh private `/tmp/iac-<uid>-<random>` Lima directory,
-so parallel calls cannot share guests and socket paths stay short. Successful
-cleanup removes the guest, runtime directory and SSH identities. If deletion
-fails, the printed recovery context identifies the retained runtime for a local
-cleanup retry.
-
-## Run locally
-
-Install Lima, QEMU and Python 3.10+ on Linux x86-64, with access to `/dev/kvm` and
-outbound network access. Lima's version is maintained in the
-[action metadata](../../actions/vm-e2e/action.yml).
-From a consumer checkout, run the script from a pinned checkout of this repository:
+For local validation, install Lima, QEMU and Python 3.10+ on Linux x86-64 with
+access to `/dev/kvm` and outbound network access. Lima's version is maintained in
+[creation metadata](../../actions/vm/create/action.yml). From a consumer checkout:
 
 ```sh
-python3 /path/to/ci-github-iac/actions/vm-e2e/vm.py run --test-script tests/e2e.sh
+python3 /path/to/ci-github-iac/actions/vm/cli.py run --test-script tests/e2e.sh
 ```
 
-Use `--vm-config`, `--artifact-path` and `--test-timeout-minutes` for the same
-options as the action. The command owns startup, assertions, reporting and cleanup.
-To retry failed cleanup, use the context path printed by that invocation:
+This local command composes the same implementations with guaranteed cleanup
+attempts. Options are `--vm-config`, `--report-directory` and
+`--test-timeout-minutes`. To retry failed cleanup, use the printed runtime path:
 
 ```sh
-python3 /path/to/ci-github-iac/actions/vm-e2e/vm.py down --context /tmp/iac-USER-RUN/context.json
+python3 /path/to/ci-github-iac/actions/vm/cli.py destroy --vm /tmp/iac-USER-RUN
 ```
 
-Repeated cleanup succeeds after the runtime is removed. In this repository,
-`make e2e` runs the reference assertions through the same implementation;
-`make test` runs unit contracts without requiring a VM.
+Repeated destruction succeeds after removal. In this repository, `make e2e`
+runs the reference scenario; `make test` checks contracts without a VM.

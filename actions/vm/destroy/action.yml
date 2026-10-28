@@ -1,0 +1,26 @@
+# Destroy the guest and verify absence before removing its private runtime and keys.
+# See [the usage guide](../../../docs/usage/vm-e2e.md) for cleanup and recovery.
+---
+name: VM - Destroy
+description: Delete an owned Lima VM, verify deletion and remove its runtime directory.
+author: Hoverkraft
+branding:
+  icon: trash-2
+  color: purple
+inputs:
+  vm:
+    description: Private runtime directory returned by vm/create; repeated deletion is safe.
+    required: true
+outputs:
+  removed:
+    description: True only after verified deletion of the guest and its runtime.
+    value: ${{ steps.destroy.outputs.removed }}
+runs:
+  using: composite
+  steps:
+    - name: Destroy VM and verify absence
+      id: destroy
+      shell: bash
+      env:
+        VM_DIRECTORY: ${{ inputs.vm }}
+      run: python3 "$GITHUB_ACTION_PATH/../cli.py" destroy

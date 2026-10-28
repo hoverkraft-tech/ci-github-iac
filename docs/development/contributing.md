@@ -17,8 +17,8 @@ only for lint commands; unknown standalone targets still fail. `make ci` runs
 Internal `__main-ci.yml` and `__pull-request-ci.yml` call `__shared-ci.yml`.
 Main supports pushes and manual runs; PR CI also supports merge queues. Both
 cancel superseded runs for the same workflow and ref. The internal action-test
-workflow exercises successful and failing calls to `actions/vm-e2e`. Consumers
-call that action directly in their own VM jobs.
+workflow composes `actions/vm/create`, `test` and `destroy` for success, assertion
+failure and startup failure. Consumers compose the same actions in their VM jobs.
 Workflows start with `permissions: {}` and grant only the permissions required by
 each job. Keep Actions pinned and step names descriptive. The aggregate `checks`
 job requires every prerequisite to succeed and is required by branch protection.
@@ -38,7 +38,7 @@ The four collaboration workflows reuse the pinned ci-github-common workflows.
 Renovate uses the organization's `CI_BOT_APP_CLIENT_ID` Actions variable and
 `CI_BOT_APP_PRIVATE_KEY` Actions secret. Its GitHub App must be installed on this
 repository with the permissions requested by the token-generation step.
-The Lima version is maintained in `actions/vm-e2e/action.yml`.
+The Lima version is maintained in `actions/vm/create/action.yml`.
 Keep the token scoped to this repository and the repository configuration in
 `.github/renovate.json`. Dependabot owns Actions and Docker updates; Renovate
 owns the configured custom dependency patterns. Schedules become active after
@@ -48,9 +48,9 @@ these workflows reach the default branch.
 
 Run `make test` for failure, cleanup and report contracts, `make lint` for the
 Hoverkraft containerized linter, and `make e2e` on a KVM-capable host for actual
-VM behavior. PR CI exercises successful guest assertions and a deliberate failure
-without a consumer Makefile. Both call the action directly; local Make invokes its
-Python backend. Do not replace a boot check with mocked CLI output.
+VM behavior. PR CI verifies action outputs across successful assertions, failed
+assertions and failed startup, without a consumer Makefile. Local Make composes
+the same Python resource and assertion components. Do not replace a boot check with mocked CLI output.
 
 ## Releases and dependencies
 

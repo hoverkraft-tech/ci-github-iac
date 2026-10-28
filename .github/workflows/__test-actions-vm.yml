@@ -1,0 +1,98 @@
+---
+name: Internal - Test VM actions
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: success
+            script: tests/fixture/assert.sh
+            config: ""
+            create-outcome: success
+            test-outcome: success
+          - scenario: assertion-failure
+            script: tests/fixture/fail.sh
+            config: ""
+            create-outcome: success
+            test-outcome: failure
+          - scenario: startup-failure
+            script: tests/fixture/assert.sh
+            config: tests/fixture/unbootable.yml
+            create-outcome: failure
+            test-outcome: skipped
+    steps:
+      - name: Checkout fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Ensure the consumer has no Makefile
+        run: rm Makefile
+      - name: Create VM
+        id: vm
+        # Expected outcomes are asserted after cleanup for every matrix case.
+        continue-on-error: true
+        uses: $/actions/vm/create
+        with:
+          vm-config: ${{ matrix.config }}
+      - name: Execute guest assertions
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: test
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          test-script: ${{ matrix.script }}
+          test-timeout-minutes: 1
+      - name: Destroy VM
+        if: ${{ always() && steps.vm.outputs.vm != '' }}
+        id: destroy
+        uses: $/actions/vm/destroy
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+      - name: Upload assertion report
+        if: ${{ always() && steps.test.outputs.report != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vm-${{ matrix.scenario }}-${{ steps.vm.outputs.id }}
+          path: ${{ steps.test.outputs.report }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify action handoffs and cleanup
+        if: ${{ always() }}
+        env:
+          EXPECTED_CREATE: ${{ matrix.create-outcome }}
+          EXPECTED_TEST: ${{ matrix.test-outcome }}
+          CREATE_OUTCOME: ${{ steps.vm.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          REMOVED: ${{ steps.destroy.outputs.removed }}
+          VM_DIRECTORY: ${{ steps.vm.outputs.vm }}
+          REPORT: ${{ steps.test.outputs.report }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          assert os.environ['CREATE_OUTCOME'] == os.environ['EXPECTED_CREATE']
+          assert os.environ['TEST_OUTCOME'] == os.environ['EXPECTED_TEST']
+          assert os.environ['REMOVED'] == 'true'
+          assert os.environ['VM_DIRECTORY']
+          assert not Path(os.environ['VM_DIRECTORY']).exists()
+          assert not Path('Makefile').exists()
+          if os.environ['EXPECTED_TEST'] == 'skipped':
+              assert not os.environ['REPORT']
+              assert not Path('.reports/e2e.junit.xml').exists()
+          else:
+              report = Path(os.environ['REPORT']).read_text()
+              failures = '1' if os.environ['EXPECTED_TEST'] == 'failure' else '0'
+              assert ET.fromstring(report).get('failures') == failures
+              assert 'synthetic-private-output' not in report
+          PYTHON

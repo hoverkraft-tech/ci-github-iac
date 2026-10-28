@@ -34,10 +34,10 @@ ci: ## Execute local CI tasks
 	$(MAKE) test
 
 docs: ## Generate action documentation
-	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/vm-e2e/action.yml --repository git
+	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/vm/create/action.yml actions/vm/test/action.yml actions/vm/destroy/action.yml --repository git
 
 e2e: ## Run guest assertions with automatic VM setup and cleanup
-	python3 actions/vm-e2e/vm.py run --test-script tests/fixture/assert.sh
+	python3 actions/vm/cli.py run --test-script tests/fixture/assert.sh
 
 #############################
 # Helpers
