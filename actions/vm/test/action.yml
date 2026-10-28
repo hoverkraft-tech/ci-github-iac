@@ -14,15 +14,12 @@ inputs:
   test-script:
     description: Nonempty Bash script in the checkout to execute inside the guest.
     required: true
-  report-directory:
-    description: Relative directory for the generated e2e.junit.xml report.
-    default: .reports
   test-timeout-minutes:
     description: Guest script timeout, from 1 to 40 minutes.
     default: "10"
 outputs:
   report:
-    description: Absolute path of the generated JUnit report, including on assertion failure.
+    description: Absolute path of this invocation's completed JUnit report in runner temp, including on assertion failure.
     value: ${{ steps.test.outputs.report }}
 runs:
   using: composite
@@ -34,7 +31,6 @@ runs:
         VM_ACTION_PATH: ${{ github.action_path }}
         VM_DIRECTORY: ${{ inputs.vm }}
         TEST_SCRIPT: ${{ inputs.test-script }}
-        REPORT_DIRECTORY: ${{ inputs.report-directory }}
         TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
       with:
         script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });

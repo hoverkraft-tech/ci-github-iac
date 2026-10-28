@@ -3,14 +3,10 @@ const path = require("node:path");
 const { Workspace } = require("./workspace.cjs");
 
 class GuestAssertions {
-	constructor(script, directory = ".reports", minutes = "10") {
-		if (!/^[a-zA-Z0-9_./-]+$/.test(directory) || path.isAbsolute(directory)) {
-			throw new Error("Expected a relative report directory");
+	constructor(script, directory, minutes = "10") {
+		if (!directory || !path.isAbsolute(directory)) {
+			throw new Error("Expected an absolute report directory");
 		}
-		const reports = new Workspace().resolve(directory);
-		fs.mkdirSync(reports, { recursive: true });
-		this.report = path.join(reports, "e2e.junit.xml");
-		fs.rmSync(this.report, { force: true });
 		if (
 			!/^[0-9]+$/.test(minutes) ||
 			Number(minutes) < 1 ||
@@ -22,9 +18,14 @@ class GuestAssertions {
 		}
 		this.timeout = Number(minutes) * 60000;
 		this.script = script;
+		this.directory = directory;
 	}
 
 	run(vm) {
+		this.report = undefined;
+		fs.mkdirSync(this.directory, { recursive: true });
+		const directory = fs.mkdtempSync(path.join(this.directory, "vm-test-"));
+		const report = path.join(directory, "e2e.junit.xml");
 		const started = performance.now();
 		let failed = false;
 		try {
@@ -45,12 +46,19 @@ class GuestAssertions {
 		const failure = failed
 			? '<failure message="Consumer script failed or timed out; inspect locally"/>'
 			: "";
-		fs.writeFileSync(
-			this.report,
-			'<?xml version="1.0" encoding="UTF-8"?>\n' +
-				`<testsuite name="disposable-vm" tests="1" failures="${failed ? 1 : 0}">` +
-				`<testcase name="consumer-script" classname="vm" time="${duration}">${failure}</testcase></testsuite>\n`,
-		);
+		try {
+			fs.writeFileSync(
+				report,
+				'<?xml version="1.0" encoding="UTF-8"?>\n' +
+					`<testsuite name="disposable-vm" tests="1" failures="${failed ? 1 : 0}">` +
+					`<testcase name="consumer-script" classname="vm" time="${duration}">${failure}</testcase></testsuite>\n`,
+				{ flag: "wx" },
+			);
+		} catch (error) {
+			fs.rmSync(directory, { recursive: true, force: true });
+			throw error;
+		}
+		this.report = report;
 		if (failed) throw new Error("Consumer assertions failed");
 	}
 }

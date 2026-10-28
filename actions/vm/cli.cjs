@@ -1,6 +1,7 @@
 const { parseArgs } = require("node:util");
 const { VirtualMachine } = require("./runtime.cjs");
 const { GuestAssertions } = require("./assertions.cjs");
+const { Workspace } = require("./workspace.cjs");
 
 function localRun(template, assertions) {
 	const vm = VirtualMachine.allocate();
@@ -9,6 +10,7 @@ function localRun(template, assertions) {
 		vm.create(template);
 		assertions.run(vm);
 	} finally {
+		if (assertions.report) console.info(`JUnit report: ${assertions.report}`);
 		vm.destroy();
 	}
 }
@@ -31,7 +33,7 @@ function main() {
 		} else if (positionals[0] === "run") {
 			const assertions = new GuestAssertions(
 				values["test-script"],
-				values["report-directory"],
+				new Workspace().resolve(values["report-directory"]),
 				values["test-timeout-minutes"],
 			);
 			localRun(VirtualMachine.template(values["vm-config"]), assertions);

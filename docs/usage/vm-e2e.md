@@ -41,7 +41,6 @@ composition and failure assertions. A consumer job uses this sequence after chec
   with:
     name: vm-${{ github.job }}-${{ steps.vm.outputs.id }}
     path: ${{ steps.test.outputs.report }}
-    include-hidden-files: true
     if-no-files-found: error
     retention-days: 7
 # jscpd:ignore-end
@@ -62,15 +61,20 @@ SSH agent forwarding and dynamic port forwarding. Lima provisioning still runs;
 treat configuration and scripts as trusted repository code.
 
 `vm/test` accepts `vm`, a required `test-script`, `test-timeout-minutes` from 1 to
-40 (default 10), and `report-directory` (default `.reports`). The script must be
+40 (default 10). The script must be
 nonempty and inside the checkout. It runs in guest Bash with `-euo pipefail`,
 standard input and `/tmp` as its working directory. Checkout files and host
 environment variables are not copied into the guest. Scripts must be self-contained
 or obtain synthetic fixtures themselves. Nonzero exit and timeout fail the action.
 
 Testing leaves the VM running, allowing additional assertions or diagnostics
-before destruction. Each test call replaces `e2e.junit.xml` in its report directory;
-use different directories when retaining multiple results. The report contains
+before destruction. Each test call creates its own private report directory under
+`runner.temp` and returns the absolute file path in `report`. No output directory
+configuration is needed. Earlier results survive later calls, including failures.
+Only a fully written report is exported; a write failure fails the action and
+removes its partial file. Publish the explicit output paths after VM cleanup.
+When uploading multiple results, pass those paths together to one upload step,
+or give each upload a distinct artifact name. The report contains
 one case for the script exit status. Guest output and exception details are
 suppressed in both the report and public logs. Startup failures skip testing and
 do not emit a report; publication uses only the current test action's output.
@@ -95,8 +99,11 @@ node /path/to/ci-github-iac/actions/vm/cli.cjs run --test-script tests/e2e.sh
 ```
 
 This local command composes the same implementations with guaranteed cleanup
-attempts. Options are `--vm-config`, `--report-directory` and
-`--test-timeout-minutes`. To retry failed cleanup, use the printed runtime path:
+attempts. Each test writes to a separate subdirectory of `.reports` and prints
+the completed report path, including on assertion failure. Options are
+`--vm-config`, `--report-directory` (a directory within the checkout) and
+`--test-timeout-minutes`. Retained local reports can be removed when no longer
+needed. To retry failed cleanup, use the printed runtime path:
 
 ```sh
 node /path/to/ci-github-iac/actions/vm/cli.cjs destroy --vm /tmp/iac-USER-RUN

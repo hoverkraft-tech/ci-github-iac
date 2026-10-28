@@ -7,3 +7,4 @@
 - [ADR 0003: Consume the VM action directly](development/adr/0003-direct-action-consumption.md)
 - [ADR 0004: Separate VM action responsibilities](development/adr/0004-focused-vm-actions.md)
 - [ADR 0005: Use the GitHub Script runtime](development/adr/0005-native-action-scripting.md)
+- [ADR 0006: Give each test invocation its own report](development/adr/0006-invocation-owned-reports.md)

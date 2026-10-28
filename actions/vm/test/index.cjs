@@ -5,14 +5,13 @@ module.exports = ({ core }) => {
 	try {
 		const assertions = new GuestAssertions(
 			process.env.TEST_SCRIPT,
-			process.env.REPORT_DIRECTORY,
+			process.env.RUNNER_TEMP,
 			process.env.TEST_TIMEOUT_MINUTES,
 		);
 		try {
 			assertions.run(new VirtualMachine(process.env.VM_DIRECTORY));
 		} finally {
-			if (require("node:fs").existsSync(assertions.report))
-				core.setOutput("report", assertions.report);
+			if (assertions.report) core.setOutput("report", assertions.report);
 		}
 	} catch {
 		core.setFailed(

@@ -51,6 +51,15 @@ jobs:
           vm: ${{ steps.vm.outputs.vm }}
           test-script: ${{ matrix.script }}
           test-timeout-minutes: 1
+      - name: Run another test on the same guest
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: repeated-test
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          test-script: tests/fixture/assert.sh
+          test-timeout-minutes: 1
       - name: Destroy VM
         if: ${{ always() && steps.vm.outputs.vm != '' }}
         id: destroy
@@ -62,8 +71,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: vm-${{ matrix.scenario }}-${{ steps.vm.outputs.id }}
-          path: ${{ steps.test.outputs.report }}
-          include-hidden-files: true
+          path: |
+            ${{ steps.test.outputs.report }}
+            ${{ steps.repeated-test.outputs.report }}
           if-no-files-found: error
           retention-days: 7
       - name: Verify action handoffs and cleanup
@@ -76,11 +86,14 @@ jobs:
           REMOVED: ${{ steps.destroy.outputs.removed }}
           VM_DIRECTORY: ${{ steps.vm.outputs.vm }}
           REPORT: ${{ steps.test.outputs.report }}
+          REPEATED_REPORT: ${{ steps.repeated-test.outputs.report }}
+          REPEATED_OUTCOME: ${{ steps.repeated-test.outcome }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const assert = require('node:assert/strict');
             const fs = require('node:fs');
+            const path = require('node:path');
             const env = process.env;
             assert.equal(env.CREATE_OUTCOME, env.EXPECTED_CREATE);
             assert.equal(env.TEST_OUTCOME, env.EXPECTED_TEST);
@@ -90,10 +103,18 @@ jobs:
             assert.equal(fs.existsSync('Makefile'), false);
             if (env.EXPECTED_TEST === 'skipped') {
               assert.equal(env.REPORT, '');
-              assert.equal(fs.existsSync('.reports/e2e.junit.xml'), false);
+              assert.equal(env.REPEATED_REPORT, '');
+              assert.equal(env.REPEATED_OUTCOME, 'skipped');
             } else {
+              assert.equal(env.REPEATED_OUTCOME, 'success');
+              assert.notEqual(env.REPORT, env.REPEATED_REPORT);
+              for (const filename of [env.REPORT, env.REPEATED_REPORT]) {
+                assert.equal(path.dirname(path.dirname(filename)), env.RUNNER_TEMP);
+              }
               const report = fs.readFileSync(env.REPORT, 'utf8');
               const failures = env.EXPECTED_TEST === 'failure' ? '1' : '0';
               assert.ok(report.includes(`failures="${failures}"`));
               assert.equal(report.includes('synthetic-private-output'), false);
+              assert.match(fs.readFileSync(env.REPEATED_REPORT, 'utf8'), /failures="0"/);
             }
+            assert.equal(fs.existsSync('.reports'), false);
