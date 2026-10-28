@@ -34,16 +34,10 @@ jobs:
   vm:
     permissions:
       contents: read
-    uses: $/.github/workflows/vm-e2e.yml
-    with:
-      test-script: tests/fixture/assert.sh
-  vm-failure:
-    permissions:
-      contents: read
     uses: $/.github/workflows/__test-action-vm-e2e.yml
   checks:
     if: ${{ always() }}
-    needs: [tests, linter, vm, vm-failure]
+    needs: [tests, linter, vm]
     runs-on: ubuntu-latest
     steps:
       - name: Require all checks

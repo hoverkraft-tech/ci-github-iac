@@ -39,3 +39,8 @@ longer requests workflow-write permission for the Lima pin.
 References: [GitHub same-repository action references](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-using-an-action-in-the-same-repository-as-the-workflow-at-the-running-commit-recommended),
 [Lima guest shell](https://lima-vm.io/docs/reference/limactl_shell/),
 [Lima plain mode](https://lima-vm.io/docs/config/plain/).
+
+## Supersession
+
+[ADR 0003](0003-direct-action-consumption.md) replaces the public workflow wrapper
+with direct action calls. The action-owned lifecycle remains unchanged.

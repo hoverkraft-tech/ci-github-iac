@@ -26,7 +26,7 @@ See [the usage guide](../../docs/usage/vm-e2e.md) for configuration and local ru
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm-e2e@b5bbf6b12e93800f40c2bde3cbf1e9f3d9b1420b # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm-e2e@0167859255277cc4b4010a42e5a9abc483be55da # feat/phase-1-bootstrap
   with:
     # Bash script in the checkout to execute inside the guest; a nonzero exit fails validation.
     # This input is required.

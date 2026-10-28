@@ -1,16 +1,15 @@
 # VM end-to-end tests
 
-Commit a Bash script containing your guest assertions, then call the
-[reusable workflow](../../.github/workflows/vm-e2e.md) at a reviewed full commit
-SHA with `test-script: tests/e2e.sh`. No Makefile is required in the consumer.
-The workflow checks out the caller and uses the
-[shared action](../../actions/vm-e2e/README.md) from its own pinned revision.
-
-To use the action directly, check out the consumer first and call
+Commit a Bash script containing your guest assertions, check out the consumer,
+and call the [shared action](../../actions/vm-e2e/README.md) as a job step:
 `hoverkraft-tech/ci-github-iac/actions/vm-e2e@<reviewed-full-commit-sha>`.
+Set `test-script: tests/e2e.sh`. No Makefile is required in the consumer.
+
 Use an ephemeral Linux x86-64 runner with KVM, Python 3.10+ and `contents: read`.
-Allow enough job time for startup, the chosen test timeout and cleanup; the
-reusable workflow supplies these runner settings and a 90-minute job budget.
+Set `persist-credentials: false` on checkout and `timeout-minutes: 90` on the VM
+job to reserve time for installation, startup, the chosen test timeout and cleanup.
+The [internal action tests](../../.github/workflows/__test-action-vm-e2e.yml)
+show direct calls for successful and failing guest scripts.
 
 ## Configure the scenario
 

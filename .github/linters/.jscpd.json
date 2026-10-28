@@ -4,8 +4,7 @@
 	"ignore": [
 		"**/__snapshots__/**",
 		"**/node_modules/**",
-		"actions/**/README.md",
-		".github/workflows/*.md"
+		"actions/**/README.md"
 	],
 	"absolute": true
 }

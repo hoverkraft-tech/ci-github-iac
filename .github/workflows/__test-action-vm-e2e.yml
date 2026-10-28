@@ -1,9 +1,23 @@
 ---
-name: Internal - Test disposable VM failure handling
+name: Internal - Test disposable VM action
 on:
   workflow_call:
 permissions: {}
 jobs:
+  success:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate guest assertions
+        uses: $/actions/vm-e2e
+        with:
+          test-script: tests/fixture/assert.sh
   failure:
     runs-on: ubuntu-latest
     timeout-minutes: 30

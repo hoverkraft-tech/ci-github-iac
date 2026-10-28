@@ -33,8 +33,8 @@ ci: ## Execute local CI tasks
 	$(MAKE) lint-fix
 	$(MAKE) test
 
-docs: ## Generate action and workflow documentation
-	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source .github/workflows/vm-e2e.yml --source actions/vm-e2e/action.yml --repository git
+docs: ## Generate action documentation
+	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/vm-e2e/action.yml --repository git
 
 e2e: ## Run guest assertions with automatic VM setup and cleanup
 	python3 actions/vm-e2e/vm.py run --test-script tests/fixture/assert.sh
