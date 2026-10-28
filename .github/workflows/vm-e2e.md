@@ -13,9 +13,9 @@
 
 ## Overview
 
-Boot a disposable Lima VM through the consumer's Make lifecycle. Assertions,
-diagnostic collection and teardown remain consumer-owned. Only synthetic,
-explicitly sanitized artifacts may be published from this public workflow.
+Execute a consumer Bash script in a disposable VM using the shared action at
+this workflow's revision. Consumers provide assertions and optional Lima YAML;
+VM installation, startup, sanitized reports and cleanup belong to the action.
 
 ### Permissions
 
@@ -35,19 +35,22 @@ on:
 permissions: {}
 jobs:
   vm-e2e:
-    uses: hoverkraft-tech/ci-github-iac/.github/workflows/vm-e2e.yml@f73ff360419a510963ed184bf84c44d1ff3ec2f3 # feat/phase-1-bootstrap
+    uses: hoverkraft-tech/ci-github-iac/.github/workflows/vm-e2e.yml@b5bbf6b12e93800f40c2bde3cbf1e9f3d9b1420b # feat/phase-1-bootstrap
     permissions:
       contents: read
     with:
-      # Directory containing the consumer Makefile.
-      # Default: `.`
-      working-directory: .
+      # Bash script in the checkout to execute inside the guest.
+      # This input is required.
+      test-script: ""
 
-      # Directory containing sanitized *.junit.xml and vm.json reports, relative to the checkout.
+      # Optional Lima YAML file in the checkout; defaults to the bundled Ubuntu template.
+      vm-config: ""
+
+      # Relative directory for generated sanitized reports.
       # Default: `.reports`
       artifact-path: .reports
 
-      # Assertion time limit; cleanup has a separate time allowance.
+      # Assertion time limit from 1 to 40 minutes; cleanup has a separate allowance.
       # Default: `10`
       test-timeout-minutes: 10
 ```
@@ -59,11 +62,12 @@ jobs:
 
 ### Workflow Call Inputs
 
-| **Input**                  | **Description**                                                                           | **Required** | **Type**   | **Default** |
-| -------------------------- | ----------------------------------------------------------------------------------------- | ------------ | ---------- | ----------- |
-| **`working-directory`**    | Directory containing the consumer Makefile.                                               | **false**    | **string** | `.`         |
-| **`artifact-path`**        | Directory containing sanitized *.junit.xml and vm.json reports, relative to the checkout. | **false**    | **string** | `.reports`  |
-| **`test-timeout-minutes`** | Assertion time limit; cleanup has a separate time allowance.                              | **false**    | **number** | `10`        |
+| **Input**                  | **Description**                                                                   | **Required** | **Type**   | **Default** |
+| -------------------------- | --------------------------------------------------------------------------------- | ------------ | ---------- | ----------- |
+| **`test-script`**          | Bash script in the checkout to execute inside the guest.                          | **true**     | **string** | -           |
+| **`vm-config`**            | Optional Lima YAML file in the checkout; defaults to the bundled Ubuntu template. | **false**    | **string** | -           |
+| **`artifact-path`**        | Relative directory for generated sanitized reports.                               | **false**    | **string** | `.reports`  |
+| **`test-timeout-minutes`** | Assertion time limit from 1 to 40 minutes; cleanup has a separate allowance.      | **false**    | **number** | `10`        |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
