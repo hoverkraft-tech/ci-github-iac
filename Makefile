@@ -4,7 +4,7 @@ SHELL := /bin/bash
 HOST_UID := $(shell id -u)
 HOST_GID := $(shell id -g)
 
-.PHONY: help lint-fix ci test lint docs e2e
+.PHONY: help lint-fix ci test lint docs
 help: ## Display help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
@@ -32,9 +32,6 @@ ci: ## Execute local CI tasks
 
 docs: ## Generate action documentation
 	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/vm/create/action.yml actions/vm/test/action.yml actions/vm/destroy/action.yml --repository git
-
-e2e: ## Run guest assertions with automatic VM setup and cleanup
-	node bin/vm.cjs run --vm-config tests/fixture/lima.yml --test-script tests/fixture/assert.sh
 
 #############################
 # Helpers

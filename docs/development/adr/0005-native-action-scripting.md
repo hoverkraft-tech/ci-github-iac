@@ -7,6 +7,7 @@ Status: Accepted. Supersedes the Python implementation choice in
 
 Reporting ownership is superseded by [ADR 0009](0009-test-action-reporting.md).
 Module ownership is refined by [ADR 0010](0010-action-module-ownership.md).
+The local CLI interface is superseded by [ADR 0011](0011-github-actions-interface.md).
 
 ## Decision
 

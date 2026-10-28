@@ -12,7 +12,7 @@ the command before linting.
 `make help` lists commands. `make lint-fix` applies supported automatic fixes;
 `make lint docs/` limits linting to matching paths. Positional filters are accepted
 only for lint commands; unknown standalone targets still fail. `make ci` runs
-`lint-fix` and unit tests locally. Run the VM lifecycle separately with `make e2e`.
+`lint-fix` and unit tests locally. VM integration tests run in the hosted action-test workflow.
 
 Internal `__main-ci.yml` and `__pull-request-ci.yml` call `__shared-ci.yml`.
 Main supports pushes and manual runs; PR CI also supports merge queues. Both
@@ -48,15 +48,15 @@ these workflows reach the default branch.
 
 Use Node.js 24.8 or later locally. Run `make test` with its built-in test runner for failure,
 cleanup, report and action-output contracts, `make lint` for the
-Hoverkraft containerized linter, and `make e2e` on a KVM-capable host for actual
+Hoverkraft containerized linter, and the hosted action-test workflow for actual
 VM behavior. PR CI verifies action outputs across successful assertions, failed
 assertions and failed startup, without a consumer Makefile. It repeats tests on
 the same guest to verify independent reports, copies JUnit and coverage files
 after assertion failures, and verifies action-owned parsing, summaries and
 artifact uploads. PR comments reuse stable titles; fork and Dependabot runs skip
 comments. Consumer workflows grant comment permissions and always schedule cleanup.
-Local Make composes
-the same JavaScript resource and assertion components. Do not replace a boot check with mocked CLI output.
+Unit tests exercise the action entrypoints and internal modules directly.
+Keep hosted boot checks alongside the mocked unit contracts.
 
 ## Releases and dependencies
 
@@ -90,7 +90,6 @@ the implementation. Each action owns its operation:
 | `actions/vm/test/reports.cjs`        | Collect selected guest reports.                                                   |
 | `actions/vm/_internal/runtime.cjs`   | Run bounded Lima commands, protect private runtime ownership and verify deletion. |
 | `actions/vm/_internal/workspace.cjs` | Resolve checkout paths without allowing escapes.                                  |
-| `bin/vm.cjs`                         | Compose creation, assertions and cleanup for local runs.                          |
 
 Actions share the internal safety primitives; action-specific code stays with its
 owner. Startup rollback and explicit destruction use the same verified cleanup.

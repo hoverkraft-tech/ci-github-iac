@@ -12,3 +12,4 @@
 - [ADR 0008: Require consumer-owned VM configuration](development/adr/0008-required-vm-configuration.md)
 - [ADR 0009: Compose test execution and reporting in vm/test](development/adr/0009-test-action-reporting.md)
 - [ADR 0010: Keep operation modules with their actions](development/adr/0010-action-module-ownership.md)
+- [ADR 0011: Expose VM operations through GitHub Actions](development/adr/0011-github-actions-interface.md)

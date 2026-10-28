@@ -4,6 +4,8 @@ Date: 2026-10-28
 
 Status: Accepted. Refines module ownership in [ADR 0005](0005-native-action-scripting.md).
 
+The local CLI interface is superseded by [ADR 0011](0011-github-actions-interface.md).
+
 ## Context
 
 Modules at the VM action root obscured which action owned their behavior. The

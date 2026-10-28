@@ -149,7 +149,7 @@ that upload. Artifact upload still runs after parser, comment or Codecov errors;
 earlier test failures remain failures. Reports contain original tool output, so
 choose only public-safe files. No extra reporting steps are needed in the workflow.
 
-## Cleanup and local runs
+## Cleanup
 
 Each creation allocates a fresh private `/tmp/iac-<uid>-<random>` Lima directory.
 Destruction verifies guest absence, then removes that directory and its SSH keys.
@@ -160,26 +160,5 @@ with a 1 MiB limit per stream; exceeding it fails the operation. Forced runner
 termination can interrupt cleanup; ephemeral runner disposal bounds remaining
 local resources. Persistent runners and cloud resource cleanup are outside scope.
 
-For local validation, install Lima, QEMU and Node.js 24.8 or later on Linux x86-64 with
-access to `/dev/kvm` and outbound network access. Lima's version is maintained in
-[creation metadata](../../actions/vm/create/action.yml). From a consumer checkout:
-
-```sh
-node /path/to/ci-github-iac/bin/vm.cjs run --vm-config tests/lima.yml --test-script tests/e2e.sh
-```
-
-This local command composes the same implementations with guaranteed cleanup
-attempts. Each test writes to a separate subdirectory of `.reports` and prints
-all completed report paths, including on assertion failure. `--vm-config` is
-required, together with exactly one of `--command` or `--test-script`. Local runs
-execute tests and collect files; GitHub reporting and uploads run only in CI.
-Optional arguments are `--report-file`, `--report-directory` (a directory within the checkout) and
-`--test-timeout-minutes`. Retained local reports can be removed when no longer
-needed. To retry failed cleanup, use the printed runtime path:
-
-```sh
-node /path/to/ci-github-iac/bin/vm.cjs destroy --vm /tmp/iac-USER-RUN
-```
-
-Repeated destruction succeeds after removal. In this repository, `make e2e`
-runs the reference scenario; `make test` checks contracts without a VM.
+A subsequent `vm/destroy` step with `if: always()` can retry cleanup on the same
+runner using the original `vm` output. Repeated destruction succeeds after removal.
