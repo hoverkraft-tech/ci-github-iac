@@ -2,11 +2,11 @@
 
 Compose three actions in your CI job:
 
-| Action                                           | Responsibility                                    | Handoff                                            |
-| ------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------- |
-| [vm/create](../../actions/vm/create/README.md)   | Install Lima and create an isolated guest         | `vm` runtime directory and unique `id`             |
-| [vm/test](../../actions/vm/test/README.md)       | Run assertions and collect test reports | `report` command status and optional `report-files` |
-| [vm/destroy](../../actions/vm/destroy/README.md) | Delete the guest and verify cleanup               | `removed: true` after successful cleanup           |
+| Action                                           | Responsibility                            | Handoff                                             |
+| ------------------------------------------------ | ----------------------------------------- | --------------------------------------------------- |
+| [vm/create](../../actions/vm/create/README.md)   | Install Lima and create an isolated guest | `vm` runtime directory and unique `id`              |
+| [vm/test](../../actions/vm/test/README.md)       | Run assertions and collect test reports   | `report` command status and optional `report-files` |
+| [vm/destroy](../../actions/vm/destroy/README.md) | Delete the guest and verify cleanup       | `removed: true` after successful cleanup            |
 
 Use an ephemeral Linux x86-64 runner with KVM and `contents: read`.
 The VM actions use the Node runtime provided by `actions/github-script`; no Python
@@ -101,7 +101,7 @@ The action gives the script a fresh, private guest directory in `REPORTS_DIR`.
 Configure the test tool to write there, for example `$REPORTS_DIR/junit.xml` and
 `$REPORTS_DIR/coverage/lcov.info`. Paths and glob patterns are relative to that
 directory. Lists accept newlines, commas or semicolons; basic `*`, `**`, `?` and
-character-class globs are supported. Use portable file names containing letters,
+character-class globs are supported. Use portable filenames containing letters,
 digits, spaces, dots, underscores or hyphens. Absolute paths and parent traversal
 are rejected, and symbolic links are excluded.
 

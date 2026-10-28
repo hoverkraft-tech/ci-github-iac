@@ -40,6 +40,15 @@ function reportFixture(t, selection = "**/*.xml,coverage/*.info") {
 	return { directory, guest, vm, command, reports, execute };
 }
 
+function assertionFixture(t) {
+	const fixture = reportFixture(t);
+	const previous = process.cwd();
+	process.chdir(fixture.directory);
+	t.after(() => process.chdir(previous));
+	fs.writeFileSync("assert.sh", "true\n");
+	return fixture;
+}
+
 test("report selection accepts lists and globs within REPORTS_DIR", () => {
 	const reports = new GuestReports("*.xml;coverage/*.info\n*.xml");
 	assert.deepEqual(
@@ -130,11 +139,7 @@ test("incomplete copies fail before reports become visible", (t) => {
 });
 
 test("test failures and timeouts still collect reports before guest report cleanup", (t) => {
-	const { directory, guest, vm, command, execute } = reportFixture(t);
-	const originalDirectory = process.cwd();
-	process.chdir(directory);
-	t.after(() => process.chdir(originalDirectory));
-	fs.writeFileSync("assert.sh", "false\n");
+	const { directory, guest, vm, command, execute } = assertionFixture(t);
 	command.mock.mockImplementation((args) => {
 		if (args.includes("bash")) {
 			assert.ok(args.includes(`REPORTS_DIR=${guest}`));
@@ -153,11 +158,7 @@ test("test failures and timeouts still collect reports before guest report clean
 });
 
 test("collection failure fails successful assertions and cleans the guest report directory", (t) => {
-	const { directory, guest, vm } = reportFixture(t);
-	const previous = process.cwd();
-	process.chdir(directory);
-	t.after(() => process.chdir(previous));
-	fs.writeFileSync("assert.sh", "true\n");
+	const { directory, guest, vm } = assertionFixture(t);
 	const assertions = new GuestAssertions(
 		"assert.sh",
 		directory,
@@ -179,11 +180,7 @@ test("report collection has a single deadline across all transfers", (t) => {
 });
 
 test("completed guest reports survive a command-status report write failure", (t) => {
-	const { directory, vm } = reportFixture(t);
-	const previous = process.cwd();
-	process.chdir(directory);
-	t.after(() => process.chdir(previous));
-	fs.writeFileSync("assert.sh", "true\n");
+	const { directory, vm } = assertionFixture(t);
 	const write = fs.writeFileSync;
 	t.mock.method(fs, "writeFileSync", (filename) => {
 		write(filename, "partial");

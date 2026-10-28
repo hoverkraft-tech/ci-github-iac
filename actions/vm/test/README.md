@@ -14,9 +14,9 @@
 
 ## Overview
 
-Run a Bash assertion script in an existing Lima VM and report its result.
+Run guest assertions and collect test reports for Hoverkraft CI reporting.
 
-Execute assertions against an existing guest and write a sanitized JUnit report.
+Execute assertions, collect selected guest reports and write command-status JUnit.
 See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 
 <!-- overview:end -->
@@ -25,7 +25,7 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@2f8dad1af867ca505901e833a78e23aa182ded8b # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@fc0766ab253fc90958ff2091f3e75d534d0afb6b # feat/phase-1-bootstrap
   with:
     # Private runtime directory returned by vm/create.
     # This input is required.
@@ -38,6 +38,12 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
     # Guest script timeout, from 1 to 40 minutes.
     # Default: `10`
     test-timeout-minutes: "10"
+
+    # Optional report paths or glob patterns relative to the guest REPORTS_DIR.
+    # Separate patterns with newlines, commas or semicolons. Every pattern must match.
+    # The script receives a fresh REPORTS_DIR; matched files are collected even after test failure.
+    # Report contents are preserved. Use only reports suitable for public CI.
+    report-file: ""
 ```
 
 <!-- usage:end -->
@@ -45,11 +51,15 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 
 ## Inputs
 
-| **Input**                  | **Description**                                                   | **Required** | **Default** |
-| -------------------------- | ----------------------------------------------------------------- | ------------ | ----------- |
-| **`vm`**                   | Private runtime directory returned by vm/create.                  | **true**     | -           |
-| **`test-script`**          | Nonempty Bash script in the checkout to execute inside the guest. | **true**     | -           |
-| **`test-timeout-minutes`** | Guest script timeout, from 1 to 40 minutes.                       | **false**    | `10`        |
+| **Input**                  | **Description**                                                                               | **Required** | **Default** |
+| -------------------------- | --------------------------------------------------------------------------------------------- | ------------ | ----------- |
+| **`vm`**                   | Private runtime directory returned by vm/create.                                              | **true**     | -           |
+| **`test-script`**          | Nonempty Bash script in the checkout to execute inside the guest.                             | **true**     | -           |
+| **`test-timeout-minutes`** | Guest script timeout, from 1 to 40 minutes.                                                   | **false**    | `10`        |
+| **`report-file`**          | Optional report paths or glob patterns relative to the guest REPORTS_DIR.                     | **false**    | -           |
+|                            | Separate patterns with newlines, commas or semicolons. Every pattern must match.              |              |             |
+|                            | The script receives a fresh REPORTS_DIR; matched files are collected even after test failure. |              |             |
+|                            | Report contents are preserved. Use only reports suitable for public CI.                       |              |             |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -58,9 +68,10 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 
 ## Outputs
 
-| **Output**   | **Description**                                                                                           |
-| ------------ | --------------------------------------------------------------------------------------------------------- |
-| **`report`** | Absolute path of this invocation's completed JUnit report in runner temp, including on assertion failure. |
+| **Output**         | **Description**                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **`report`**       | Absolute path of the sanitized command-status JUnit report, including on assertion or collection failure.     |
+| **`report-files`** | Newline-separated absolute paths of completed guest report files. Empty when collection is disabled or fails. |
 
 <!-- outputs:end -->
 <!-- examples:start -->
