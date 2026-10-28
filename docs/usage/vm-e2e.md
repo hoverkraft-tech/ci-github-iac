@@ -39,3 +39,9 @@ The VM has 2 CPUs, 2 GiB RAM and a 10 GiB disk. Lima plain mode disables host
 filesystem mounts, agent forwarding and dynamic port forwarding. It still needs
 outbound network access for image download and initial boot. This test does not
 qualify nested Proxmox virtualization or application recovery.
+
+Lima runtime files use a private `/tmp/iac-<uid>-<checkout-hash>` directory to
+stay within Unix socket path limits. `.cache/e2e/lima-home` records its location.
+Each checkout has its own runtime; symlinks and shared directories are rejected.
+Teardown removes the VM disk. Small Lima configuration files can remain in the
+private temporary directory until the host cleans it or the CI runner expires.

@@ -36,6 +36,42 @@ class FixtureTests(unittest.TestCase):
         environment.start()
         self.addCleanup(environment.stop)
         self.vm = fixture.Fixture()
+        self.vm.lima_home = self.root / "lima"
+        self.vm.environment["LIMA_HOME"] = str(self.vm.lima_home)
+
+    def test_long_checkout_paths_keep_runtime_sockets_short(self) -> None:
+        """Deep consumer checkouts fit Lima's Linux Unix socket limit."""
+        with patch.dict(
+            os.environ,
+            {
+                "E2E_STATE_DIR": str(self.root / ("a" * 200) / ".cache/e2e"),
+                "E2E_VM_NAME": "iac-" + "n" * 32,
+            },
+        ):
+            vm = fixture.Fixture()
+        socket = vm.lima_home / vm.name / "ssh.sock.1234567890123456"
+        self.assertLess(len(str(socket).encode()), 108)
+
+    def test_runtime_is_scoped_to_checkout(self) -> None:
+        """Different consumers cannot share a fixture runtime directory."""
+        first = fixture.Fixture().lima_home
+        with patch.dict(os.environ, {"E2E_STATE_DIR": str(self.root / "another-checkout")}):
+            second = fixture.Fixture().lima_home
+        self.assertNotEqual(first, second)
+
+    def test_symlinked_runtime_is_rejected(self) -> None:
+        """A pre-existing temporary-directory symlink cannot redirect VM writes."""
+        target = self.root / "other"
+        target.mkdir(mode=0o700)
+        self.vm.lima_home.symlink_to(target, target_is_directory=True)
+        with self.assertRaises(RuntimeError):
+            self.vm.up()
+
+    def test_shared_runtime_is_rejected(self) -> None:
+        """A runtime readable by other users cannot hold fixture SSH identities."""
+        self.vm.lima_home.mkdir(mode=0o755)
+        with self.assertRaises(RuntimeError):
+            self.vm.up()
 
     def test_rejects_unscoped_instance_names(self) -> None:
         """Production VM names cannot be passed to the disposable fixture."""

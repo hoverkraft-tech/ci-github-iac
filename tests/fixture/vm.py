@@ -1,9 +1,11 @@
 """Credential-free Lima fixture; reports contain only fixed assertion names/status."""
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import time
 import xml.etree.ElementTree as ET
@@ -15,11 +17,21 @@ class Fixture:
 
     def __init__(self) -> None:
         self.name = os.environ.get("E2E_VM_NAME", "iac-fixture")
-        if not re.fullmatch(r"iac-[a-z0-9-]{1,50}", self.name):
+        if not re.fullmatch(r"iac-[a-z0-9-]{1,32}", self.name):
             raise ValueError("E2E_VM_NAME must start with iac- and use lowercase letters, digits or hyphens")
         self.state = Path(os.environ.get("E2E_STATE_DIR", ".cache/e2e")).resolve()
         self.reports = Path(os.environ.get("REPORTS_DIR", ".reports")).resolve()
-        self.environment = {**os.environ, "LIMA_HOME": str(self.state / "lima")}
+        # Lima reserves 17 extra bytes for SSH's temporary socket suffix. Checkout
+        # paths can exceed UNIX_PATH_MAX even before adding the instance name.
+        identity = hashlib.sha256(str(self.state).encode()).hexdigest()[:12]
+        self.lima_home = Path("/tmp") / f"iac-{os.getuid()}-{identity}"
+        self.environment = {**os.environ, "LIMA_HOME": str(self.lima_home)}
+
+    def validate_runtime(self) -> None:
+        """Reject shared, foreign-owned or symlinked runtime directories."""
+        info = self.lima_home.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise RuntimeError("Fixture runtime must be a private directory owned by this user")
 
     def lima(self, *arguments: str, timeout: int = 120) -> str:
         """Run a bounded command without leaking subprocess output into reports."""
@@ -35,13 +47,17 @@ class Fixture:
 
     def exists(self) -> bool:
         """Find only this fixture in its dedicated Lima home."""
-        if not Path(self.environment["LIMA_HOME"]).exists():
+        if not self.lima_home.exists() and not self.lima_home.is_symlink():
             return False
+        self.validate_runtime()
         return self.name in self.lima("list", "--format", "{{.Name}}").splitlines()
 
     def up(self) -> None:
         """Invalidate old evidence and create a cold VM from the pinned image."""
         self.state.mkdir(parents=True, exist_ok=True)
+        self.lima_home.mkdir(mode=0o700, exist_ok=True)
+        self.validate_runtime()
+        (self.state / "lima-home").write_text(str(self.lima_home) + "\n")
         self.reports.mkdir(parents=True, exist_ok=True)
         # A prior successful report must never satisfy assertions for a new run.
         (self.reports / "e2e.junit.xml").unlink(missing_ok=True)
