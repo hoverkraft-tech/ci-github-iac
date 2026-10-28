@@ -25,7 +25,7 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for cleanup and recovery.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@fc0766ab253fc90958ff2091f3e75d534d0afb6b # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@44c6dfec6d564c29f18bad30b47fd0118a70156e # feat/phase-1-bootstrap
   with:
     # Private runtime directory returned by vm/create; repeated deletion is safe.
     # This input is required.

@@ -25,9 +25,10 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@fc0766ab253fc90958ff2091f3e75d534d0afb6b # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@44c6dfec6d564c29f18bad30b47fd0118a70156e # feat/phase-1-bootstrap
   with:
-    # Optional Lima YAML file in the checkout; defaults to pinned Ubuntu. Plain mode is enforced.
+    # Path to a Lima YAML file in the checkout. Plain mode is enforced.
+    # This input is required.
     vm-config: ""
 ```
 
@@ -36,9 +37,9 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 
 ## Inputs
 
-| **Input**       | **Description**                                                                             | **Required** | **Default** |
-| --------------- | ------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`vm-config`** | Optional Lima YAML file in the checkout; defaults to pinned Ubuntu. Plain mode is enforced. | **false**    | -           |
+| **Input**       | **Description**                                                   | **Required** | **Default** |
+| --------------- | ----------------------------------------------------------------- | ------------ | ----------- |
+| **`vm-config`** | Path to a Lima YAML file in the checkout. Plain mode is enforced. | **true**     | -           |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
