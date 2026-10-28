@@ -29,6 +29,7 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Validate time budget
+        working-directory: ${{ github.workspace }}
         env:
           TEST_MINUTES: ${{ inputs.test-timeout-minutes }}
         run: |
