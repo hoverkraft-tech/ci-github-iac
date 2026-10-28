@@ -22,6 +22,26 @@ Workflows start with `permissions: {}` and grant only the permissions required b
 each job. Keep Actions pinned and step names descriptive. The aggregate `checks`
 job requires every prerequisite to succeed and is required by branch protection.
 
+## Repository automation
+
+Keep the five Hoverkraft maintenance workflows alongside the CI entrypoints:
+
+- `__greetings.yml` welcomes first-time contributors on new issues and PRs.
+- `__need-fix-to-issue.yml` turns fix markers into issues after main pushes, or
+  for a manually selected commit range.
+- `__semantic-pull-request.yml` validates Conventional Commit PR titles.
+- `__renovate.yml` runs dependency updates weekly and on manual dispatch.
+- `__stale.yml` manages inactive issues and PRs daily using shared defaults.
+
+The four collaboration workflows reuse the pinned ci-github-common workflows.
+Renovate uses the organization's `CI_BOT_APP_CLIENT_ID` Actions variable and
+`CI_BOT_APP_PRIVATE_KEY` Actions secret. Its GitHub App must be installed on this
+repository with the permissions requested by the token-generation step.
+Keep the token scoped to this repository and the repository configuration in
+`.github/renovate.json`. Dependabot owns Actions and Docker updates; Renovate
+owns the configured custom dependency patterns. Schedules become active after
+these workflows reach the default branch.
+
 ## Validation
 
 Run `make test` for failure, cleanup and report contracts, `make lint` for the
