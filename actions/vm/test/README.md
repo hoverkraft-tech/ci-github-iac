@@ -25,7 +25,7 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@2105e33038284c0bf15373eb5d3e95ed4bc8181f # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@865b2c192478caea3975f21d61f6ec494d1fdc96 # feat/phase-1-bootstrap
   with:
     # Private runtime directory returned by vm/create.
     # This input is required.

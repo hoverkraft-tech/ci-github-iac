@@ -1,3 +1,0 @@
-[FORMAT]
-# Match the shared Ruff and Flake8 line length.
-max-line-length=120
