@@ -31,7 +31,7 @@ inputs:
     default: ""
   coverage:
     description: |
-      Coverage reporter; github for summaries and PR comments, codecov for upload,
+      Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,
       or empty to disable reporting. Report artifacts are always retained.
       Codecov requires report-file selection and id-token write permission for OIDC.
     default: github
@@ -52,13 +52,13 @@ outputs:
     description: Newline-separated absolute paths of completed guest report files. Empty when collection is disabled or fails.
     value: ${{ steps.test.outputs.report-files }}
   summary:
-    description: Parsed test and coverage summary in github mode.
+    description: Parsed test and coverage summary in GitHub mode.
     value: ${{ steps.parse-coverage-reports.outputs.summary }}
   markdown:
-    description: Markdown used for the coverage PR comment in github mode.
+    description: Markdown used for the coverage PR comment in GitHub mode.
     value: ${{ steps.parse-coverage-reports.outputs.markdown }}
   parsed-files:
-    description: JSON array of report files parsed in github mode.
+    description: JSON array of report files parsed in GitHub mode.
     value: ${{ steps.parse-coverage-reports.outputs.parsed-files }}
   artifact-id:
     description: Uploaded report artifact identifier.

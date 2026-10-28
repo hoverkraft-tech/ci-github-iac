@@ -14,9 +14,9 @@
 
 ## Overview
 
-Run guest assertions and collect test reports for Hoverkraft CI reporting.
+Run guest test commands, parse reports, comment on pull requests and upload results.
 
-Execute assertions, collect selected guest reports and write command-status JUnit.
+Execute guest tests, collect reports and publish coverage results.
 See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 
 <!-- overview:end -->
@@ -25,25 +25,46 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@44c6dfec6d564c29f18bad30b47fd0118a70156e # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@dced70c9039bddd0b5903c5eb2e61c1ee2e0db9b # feat/phase-1-bootstrap
   with:
     # Private runtime directory returned by vm/create.
     # This input is required.
     vm: ""
 
-    # Nonempty Bash script in the checkout to execute inside the guest.
-    # This input is required.
+    # Bash command or multiline commands to execute inside the guest from /tmp.
+    # Provide exactly one of command or test-script. Checkout files are not mounted in the guest.
+    command: ""
+
+    # Nonempty Bash script in the checkout to send to the guest instead of command.
     test-script: ""
 
-    # Guest script timeout, from 1 to 40 minutes.
+    # Guest command timeout, from 1 to 40 minutes.
     # Default: `10`
     test-timeout-minutes: "10"
 
     # Optional report paths or glob patterns relative to the guest REPORTS_DIR.
     # Separate patterns with newlines, commas or semicolons. Every pattern must match.
-    # The script receives a fresh REPORTS_DIR; matched files are collected even after test failure.
+    # Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.
     # Report contents are preserved. Use only reports suitable for public CI.
     report-file: ""
+
+    # Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,
+    # or empty to disable reporting. Report artifacts are always retained.
+    # Codecov requires report-file selection and id-token write permission for OIDC.
+    #
+    # Default: `github`
+    coverage: github
+
+    # Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.
+    # Default: `VM test results`
+    report-name: VM test results
+
+    # Optional path mappings forwarded to Hoverkraft's report parser.
+    path-mapping: ""
+
+    # Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped.
+    # Default: `${{ github.token }}`
+    github-token: ${{ github.token }}
 ```
 
 <!-- usage:end -->
@@ -51,15 +72,23 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 
 ## Inputs
 
-| **Input**                  | **Description**                                                                               | **Required** | **Default** |
-| -------------------------- | --------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`vm`**                   | Private runtime directory returned by vm/create.                                              | **true**     | -           |
-| **`test-script`**          | Nonempty Bash script in the checkout to execute inside the guest.                             | **true**     | -           |
-| **`test-timeout-minutes`** | Guest script timeout, from 1 to 40 minutes.                                                   | **false**    | `10`        |
-| **`report-file`**          | Optional report paths or glob patterns relative to the guest REPORTS_DIR.                     | **false**    | -           |
-|                            | Separate patterns with newlines, commas or semicolons. Every pattern must match.              |              |             |
-|                            | The script receives a fresh REPORTS_DIR; matched files are collected even after test failure. |              |             |
-|                            | Report contents are preserved. Use only reports suitable for public CI.                       |              |             |
+| **Input**                  | **Description**                                                                                            | **Required** | **Default**           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
+| **`vm`**                   | Private runtime directory returned by vm/create.                                                           | **true**     | -                     |
+| **`command`**              | Bash command or multiline commands to execute inside the guest from /tmp.                                  | **false**    | -                     |
+|                            | Provide exactly one of command or test-script. Checkout files are not mounted in the guest.                |              |                       |
+| **`test-script`**          | Nonempty Bash script in the checkout to send to the guest instead of command.                              | **false**    | -                     |
+| **`test-timeout-minutes`** | Guest command timeout, from 1 to 40 minutes.                                                               | **false**    | `10`                  |
+| **`report-file`**          | Optional report paths or glob patterns relative to the guest REPORTS_DIR.                                  | **false**    | -                     |
+|                            | Separate patterns with newlines, commas or semicolons. Every pattern must match.                           |              |                       |
+|                            | Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.                 |              |                       |
+|                            | Report contents are preserved. Use only reports suitable for public CI.                                    |              |                       |
+| **`coverage`**             | Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,                           | **false**    | `github`              |
+|                            | or empty to disable reporting. Report artifacts are always retained.                                       |              |                       |
+|                            | Codecov requires report-file selection and id-token write permission for OIDC.                             |              |                       |
+| **`report-name`**          | Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.           | **false**    | `VM test results`     |
+| **`path-mapping`**         | Optional path mappings forwarded to Hoverkraft's report parser.                                            | **false**    | -                     |
+| **`github-token`**         | Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped. | **false**    | `${{ github.token }}` |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -72,6 +101,10 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 | ------------------ | ------------------------------------------------------------------------------------------------------------- |
 | **`report`**       | Absolute path of the sanitized command-status JUnit report, including on assertion or collection failure.     |
 | **`report-files`** | Newline-separated absolute paths of completed guest report files. Empty when collection is disabled or fails. |
+| **`summary`**      | Parsed test and coverage summary in GitHub mode.                                                              |
+| **`markdown`**     | Markdown used for the coverage PR comment in GitHub mode.                                                     |
+| **`parsed-files`** | JSON array of report files parsed in GitHub mode.                                                             |
+| **`artifact-id`**  | Uploaded report artifact identifier.                                                                          |
 
 <!-- outputs:end -->
 <!-- examples:start -->
