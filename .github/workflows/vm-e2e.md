@@ -35,7 +35,7 @@ on:
 permissions: {}
 jobs:
   vm-e2e:
-    uses: hoverkraft-tech/ci-github-iac/.github/workflows/vm-e2e.yml@8c2bf28f5cca8dc97f05bd36dbb557de5f92e55a # feat/phase-1-bootstrap
+    uses: hoverkraft-tech/ci-github-iac/.github/workflows/vm-e2e.yml@bfd3b9b40316fd4cd6ada4f9d548514f9fc2e818 # feat/phase-1-bootstrap
     permissions:
       contents: read
     with:
