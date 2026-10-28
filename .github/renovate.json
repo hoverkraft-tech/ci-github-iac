@@ -1,16 +1,23 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "enabledManagers": ["custom.regex"],
-  "customManagers": [{
-    "customType": "regex",
-    "managerFilePatterns": ["/\\.github/workflows/.*\\.yml$/"],
-    "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+version: (?<currentValue>\\S+)"],
-    "versioningTemplate": "semver"
-  }, {
-    "customType": "regex",
-    "managerFilePatterns": ["/^Makefile$/"],
-    "matchStrings": ["--package=(?<depName>@ci-dokumentor/cli)@(?<currentValue>\\S+)"],
-    "datasourceTemplate": "npm"
-  }]
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended"],
+	"enabledManagers": ["custom.regex"],
+	"customManagers": [
+		{
+			"customType": "regex",
+			"managerFilePatterns": ["/\\.github/workflows/.*\\.yml$/"],
+			"matchStrings": [
+				"# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+version: (?<currentValue>\\S+)"
+			],
+			"versioningTemplate": "semver"
+		},
+		{
+			"customType": "regex",
+			"managerFilePatterns": ["/^Makefile$/"],
+			"matchStrings": [
+				"--package=(?<depName>@ci-dokumentor/cli)@(?<currentValue>\\S+)"
+			],
+			"datasourceTemplate": "npm"
+		}
+	]
 }

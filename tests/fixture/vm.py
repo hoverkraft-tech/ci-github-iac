@@ -3,11 +3,11 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import time
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 
 class Fixture:
@@ -22,18 +22,25 @@ class Fixture:
         self.environment = {**os.environ, "LIMA_HOME": str(self.state / "lima")}
 
     def lima(self, *arguments: str, timeout: int = 120) -> str:
+        """Run a bounded command without leaking subprocess output into reports."""
         result = subprocess.run(
-            ["limactl", *arguments], env=self.environment,
-            check=True, capture_output=True, text=True, timeout=timeout,
+            ["limactl", *arguments],
+            env=self.environment,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
         return result.stdout.strip()
 
     def exists(self) -> bool:
+        """Find only this fixture in its dedicated Lima home."""
         if not Path(self.environment["LIMA_HOME"]).exists():
             return False
         return self.name in self.lima("list", "--format", "{{.Name}}").splitlines()
 
     def up(self) -> None:
+        """Invalidate old evidence and create a cold VM from the pinned image."""
         self.state.mkdir(parents=True, exist_ok=True)
         self.reports.mkdir(parents=True, exist_ok=True)
         # A prior successful report must never satisfy assertions for a new run.
@@ -41,14 +48,32 @@ class Fixture:
         if self.exists():
             raise RuntimeError("Fixture already exists; run make e2e-down before a cold-start test")
         template = Path(__file__).with_name("lima.yml")
-        self.lima("start", "--tty=false", "--timeout=10m", f"--name={self.name}", str(template), timeout=660)
+        self.lima(
+            "start",
+            "--tty=false",
+            "--timeout=10m",
+            f"--name={self.name}",
+            str(template),
+            timeout=660,
+        )
 
     def test(self) -> None:
+        """Assert guest behavior and serialize only fixed assertion metadata."""
         self.reports.mkdir(parents=True, exist_ok=True)
         suite = ET.Element("testsuite", name="disposable-vm", tests="2", failures="0")
         checks = [
-            ("ubuntu-boot", "test \"$(. /etc/os-release; printf '%s' \"$ID\")\" = ubuntu; test -d /run/systemd/system"),
-            ("guest-write-read", "test ! -e /tmp/iac-fixture; printf '%s' synthetic > /tmp/iac-fixture; test \"$(cat /tmp/iac-fixture)\" = synthetic; rm /tmp/iac-fixture"),
+            (
+                "ubuntu-boot",
+                ('test "$(. /etc/os-release; printf \'%s\' "$ID")" = ubuntu; test -d /run/systemd/system'),
+            ),
+            (
+                "guest-write-read",
+                (
+                    "test ! -e /tmp/iac-fixture; "
+                    "printf '%s' synthetic > /tmp/iac-fixture; "
+                    'test "$(cat /tmp/iac-fixture)" = synthetic; rm /tmp/iac-fixture'
+                ),
+            ),
         ]
         failed = False
         for name, command in checks:
@@ -67,6 +92,7 @@ class Fixture:
             raise RuntimeError("Guest assertions failed")
 
     def collect(self) -> None:
+        """Collect a status from an allowlist without raw guest diagnostics."""
         self.reports.mkdir(parents=True, exist_ok=True)
         status = "absent"
         if self.exists():
@@ -75,6 +101,7 @@ class Fixture:
         (self.reports / "vm.json").write_text(json.dumps({"status": status}) + "\n")
 
     def down(self) -> None:
+        """Delete the synthetic instance and verify that cleanup succeeded."""
         if not self.exists():
             return
         self.lima("delete", "--force", self.name)

@@ -27,4 +27,4 @@ jobs:
       security-events: write
       statuses: write
   vm:
-    uses: ./.github/workflows/vm-e2e.yml
+    uses: $/.github/workflows/vm-e2e.yml
