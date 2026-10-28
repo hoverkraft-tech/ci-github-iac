@@ -37,6 +37,7 @@ The four collaboration workflows reuse the pinned ci-github-common workflows.
 Renovate uses the organization's `CI_BOT_APP_CLIENT_ID` Actions variable and
 `CI_BOT_APP_PRIVATE_KEY` Actions secret. Its GitHub App must be installed on this
 repository with the permissions requested by the token-generation step.
+Workflow-write permission is required for the Lima version in `vm-e2e.yml`.
 Keep the token scoped to this repository and the repository configuration in
 `.github/renovate.json`. Dependabot owns Actions and Docker updates; Renovate
 owns the configured custom dependency patterns. Schedules become active after
