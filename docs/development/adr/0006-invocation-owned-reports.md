@@ -5,6 +5,8 @@ Date: 2026-10-28
 Status: Accepted. Refines reporting for the focused actions in
 [ADR 0004](0004-focused-vm-actions.md).
 
+Reporting ownership is superseded by [ADR 0009](0009-test-action-reporting.md).
+
 ## Context
 
 Multiple test steps can share a VM. Writing every result to the same checkout

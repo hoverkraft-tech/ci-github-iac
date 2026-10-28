@@ -5,6 +5,8 @@ Date: 2026-10-28
 Status: Accepted. Extends [ADR 0006](0006-invocation-owned-reports.md).
 The bundled guest assumption is superseded by [ADR 0008](0008-required-vm-configuration.md).
 
+Reporting ownership is superseded by [ADR 0009](0009-test-action-reporting.md).
+
 ## Decision
 
 Follow the report-selection and shared-parser pattern in

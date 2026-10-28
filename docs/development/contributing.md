@@ -52,7 +52,9 @@ Hoverkraft containerized linter, and `make e2e` on a KVM-capable host for actual
 VM behavior. PR CI verifies action outputs across successful assertions, failed
 assertions and failed startup, without a consumer Makefile. It repeats tests on
 the same guest to verify independent reports, copies JUnit and coverage files
-after assertion failures, and verifies the shared parser's file list and summary.
+after assertion failures, and verifies action-owned parsing, summaries and
+artifact uploads. PR comments reuse stable titles; fork and Dependabot runs skip
+comments. Consumer workflows grant comment permissions and always schedule cleanup.
 Local Make composes
 the same JavaScript resource and assertion components. Do not replace a boot check with mocked CLI output.
 

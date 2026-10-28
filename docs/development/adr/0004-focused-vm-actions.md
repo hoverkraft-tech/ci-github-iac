@@ -6,6 +6,8 @@ Status: Accepted. Supersedes the combined action boundary in
 [ADR 0003](0003-direct-action-consumption.md) and
 [ADR 0002](0002-action-owned-vm-lifecycle.md).
 
+Reporting ownership is superseded by [ADR 0009](0009-test-action-reporting.md).
+
 ## Decision
 
 Expose `vm/create`, `vm/test` and `vm/destroy` as separate actions. Creation owns

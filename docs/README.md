@@ -10,3 +10,4 @@
 - [ADR 0006: Give each test invocation its own report](development/adr/0006-invocation-owned-reports.md)
 - [ADR 0007: Collect guest reports and reuse Hoverkraft reporting](development/adr/0007-guest-report-collection.md)
 - [ADR 0008: Require consumer-owned VM configuration](development/adr/0008-required-vm-configuration.md)
+- [ADR 0009: Compose test execution and reporting in vm/test](development/adr/0009-test-action-reporting.md)

@@ -5,6 +5,8 @@ Date: 2026-10-28
 Status: Accepted. Supersedes the Python implementation choice in
 [ADR 0004](0004-focused-vm-actions.md); the three action responsibilities remain.
 
+Reporting ownership is superseded by [ADR 0009](0009-test-action-reporting.md).
+
 ## Decision
 
 Use pinned `actions/github-script` steps for VM creation, assertion execution and

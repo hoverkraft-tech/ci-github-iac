@@ -24,6 +24,7 @@ function main() {
 			options: {
 				vm: { type: "string", default: "" },
 				"vm-config": { type: "string" },
+				command: { type: "string", default: "" },
 				"test-script": { type: "string", default: "" },
 				"report-directory": { type: "string", default: ".reports" },
 				"report-file": { type: "string", default: "" },
@@ -35,7 +36,7 @@ function main() {
 			new VirtualMachine(values.vm).destroy();
 		} else if (positionals[0] === "run") {
 			const assertions = new GuestAssertions(
-				values["test-script"],
+				{ command: values.command, script: values["test-script"] },
 				new Workspace().resolve(values["report-directory"]),
 				values["test-timeout-minutes"],
 				values["report-file"],

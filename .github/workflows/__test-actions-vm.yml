@@ -9,25 +9,31 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
         include:
           - scenario: success
             report-file: ""
-            script: tests/fixture/assert.sh
+            script: ""
+            command: |
+              test -d /run/systemd/system
+              test "$(uname -s)" = Linux
             config: tests/fixture/lima.yml
             create-outcome: success
             test-outcome: success
           - scenario: assertion-failure
             report-file: "*.xml"
             script: tests/fixture/fail.sh
+            command: ""
             config: tests/fixture/lima.yml
             create-outcome: success
             test-outcome: failure
           - scenario: startup-failure
             report-file: ""
             script: tests/fixture/assert.sh
+            command: ""
             config: tests/fixture/unbootable.yml
             create-outcome: failure
             test-outcome: skipped
@@ -53,8 +59,11 @@ jobs:
         with:
           vm: ${{ steps.vm.outputs.vm }}
           test-script: ${{ matrix.script }}
+          command: ${{ matrix.command }}
           test-timeout-minutes: 1
           report-file: ${{ matrix.report-file }}
+          report-name: VM tests - ${{ matrix.scenario }} - first
+          path-mapping: /guest/project:.
       - name: Run another test on the same guest
         if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
         id: repeated-test
@@ -65,37 +74,25 @@ jobs:
           test-script: tests/fixture/assert.sh
           test-timeout-minutes: 1
           report-file: "*.xml,coverage/*.info"
+          report-name: VM tests - ${{ matrix.scenario }} - repeated
+      - name: Verify reporting failure still uploads evidence
+        if: >-
+          ${{ !cancelled() && steps.vm.outcome == 'success' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+        id: reporting-failure
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          command: "true"
+          report-name: VM tests - ${{ matrix.scenario }} - reporting failure
+          # A synthetic invalid token must fail commenting, not test execution or artifact upload.
+          github-token: synthetic-invalid-token
       - name: Destroy VM
         if: ${{ always() && steps.vm.outputs.vm != '' }}
         id: destroy
         uses: $/actions/vm/destroy
         with:
           vm: ${{ steps.vm.outputs.vm }}
-      - name: Summarize assertion reports
-        if: >-
-          ${{ always() && (steps.test.outputs.report != '' || steps.test.outputs.report-files != '' || steps.repeated-test.outputs.report != '' || steps.repeated-test.outputs.report-files != '') }}
-        id: reports
-        uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
-        with:
-          report-name: VM assertions - ${{ matrix.scenario }}
-          report-paths: |
-            ${{ steps.test.outputs.report-files || steps.test.outputs.report }}
-            ${{ steps.repeated-test.outputs.report-files || steps.repeated-test.outputs.report }}
-          output-format: summary,annotations
-          path-mapping: /guest/project:.
-      - name: Upload assertion report
-        if: >-
-          ${{ always() && (steps.test.outputs.report != '' || steps.test.outputs.report-files != '' || steps.repeated-test.outputs.report != '' || steps.repeated-test.outputs.report-files != '') }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: vm-${{ matrix.scenario }}-${{ steps.vm.outputs.id }}
-          path: |
-            ${{ steps.test.outputs.report }}
-            ${{ steps.repeated-test.outputs.report }}
-            ${{ steps.test.outputs.report-files }}
-            ${{ steps.repeated-test.outputs.report-files }}
-          if-no-files-found: error
-          retention-days: 7
       - name: Verify action handoffs and cleanup
         if: ${{ always() }}
         env:
@@ -108,9 +105,15 @@ jobs:
           REPORT: ${{ steps.test.outputs.report }}
           REPEATED_REPORT: ${{ steps.repeated-test.outputs.report }}
           REPEATED_OUTCOME: ${{ steps.repeated-test.outcome }}
-          REPORTS_OUTCOME: ${{ steps.reports.outcome }}
-          PARSED_REPORTS: ${{ steps.reports.outputs.parsed-files }}
-          REPORT_SUMMARY: ${{ steps.reports.outputs.summary }}
+          PARSED_REPORTS: ${{ steps.test.outputs.parsed-files }}
+          REPEATED_PARSED_REPORTS: ${{ steps.repeated-test.outputs.parsed-files }}
+          ARTIFACT: ${{ steps.test.outputs.artifact-id }}
+          REPEATED_ARTIFACT: ${{ steps.repeated-test.outputs.artifact-id }}
+          REPORTING_FAILURE_OUTCOME: ${{ steps.reporting-failure.outcome }}
+          REPORTING_FAILURE_ARTIFACT: ${{ steps.reporting-failure.outputs.artifact-id }}
+          REPORTING_FAILURE_REPORT: ${{ steps.reporting-failure.outputs.report }}
+          REPORT_SUMMARY: ${{ steps.test.outputs.summary }}
+          REPEATED_SUMMARY: ${{ steps.repeated-test.outputs.summary }}
           GUEST_REPORTS: ${{ steps.test.outputs.report-files }}
           REPEATED_GUEST_REPORTS: ${{ steps.repeated-test.outputs.report-files }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -126,11 +129,18 @@ jobs:
             assert.ok(env.VM_DIRECTORY);
             assert.equal(fs.existsSync(env.VM_DIRECTORY), false);
             assert.equal(fs.existsSync('Makefile'), false);
+            if (env.REPORTING_FAILURE_OUTCOME !== 'skipped') {
+              assert.equal(env.REPORTING_FAILURE_OUTCOME, 'failure');
+              assert.ok(env.REPORTING_FAILURE_ARTIFACT);
+              assert.match(fs.readFileSync(env.REPORTING_FAILURE_REPORT, 'utf8'), /failures="0"/);
+            }
             if (env.EXPECTED_TEST === 'skipped') {
               assert.equal(env.REPORT, '');
               assert.equal(env.REPEATED_REPORT, '');
               assert.equal(env.REPEATED_OUTCOME, 'skipped');
-              assert.equal(env.REPORTS_OUTCOME, 'skipped');
+              assert.equal(env.ARTIFACT, '');
+              assert.equal(env.REPEATED_ARTIFACT, '');
+              assert.equal(env.REPEATED_SUMMARY, '');
               assert.equal(env.REPORT_SUMMARY, '');
               assert.equal(env.GUEST_REPORTS, '');
               assert.equal(env.REPEATED_GUEST_REPORTS, '');
@@ -145,7 +155,9 @@ jobs:
               assert.ok(report.includes(`failures="${failures}"`));
               assert.equal(report.includes('synthetic-private-output'), false);
               assert.match(fs.readFileSync(env.REPEATED_REPORT, 'utf8'), /failures="0"/);
-              assert.equal(env.REPORTS_OUTCOME, 'success');
+              assert.ok(env.ARTIFACT);
+              assert.ok(env.REPEATED_ARTIFACT);
+              assert.notEqual(env.ARTIFACT, env.REPEATED_ARTIFACT);
               const guestReports = env.GUEST_REPORTS.split('\n').filter(Boolean);
               const repeatedReports = env.REPEATED_GUEST_REPORTS.split('\n').filter(Boolean);
               assert.equal(guestReports.length, failures === '1' ? 1 : 0);
@@ -155,12 +167,15 @@ jobs:
               }
               assert.deepEqual(
                 JSON.parse(env.PARSED_REPORTS).sort(),
-                [...(guestReports.length ? guestReports : [env.REPORT]), ...repeatedReports].sort()
+                (guestReports.length ? guestReports : [env.REPORT]).sort()
               );
-              assert.ok(env.REPORT_SUMMARY.includes('| **Total** | **2** |'));
+              assert.deepEqual(JSON.parse(env.REPEATED_PARSED_REPORTS).sort(), repeatedReports.sort());
+              assert.ok(env.REPORT_SUMMARY.includes('| **Total** | **1** |'));
+              assert.ok(env.REPEATED_SUMMARY.includes('| **Total** | **1** |'));
               assert.ok(env.REPORT_SUMMARY.includes(`| ❌ Failed | ${failures} |`));
               assert.equal(env.REPORT_SUMMARY.includes('synthetic-private-output'), false);
-              assert.ok(env.REPORT_SUMMARY.includes('### Coverage Report'));
+              assert.ok(env.REPEATED_SUMMARY.includes('### Coverage Report'));
+              assert.ok(env.REPEATED_SUMMARY.includes('| ❌ Failed | 0 |'));
               assert.equal(env.REPORT_SUMMARY.includes('/guest/project'), false);
             }
             assert.equal(fs.existsSync('.reports'), false);

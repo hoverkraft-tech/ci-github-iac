@@ -4,7 +4,7 @@ const { Workspace } = require("./workspace.cjs");
 const { GuestReports } = require("./reports.cjs");
 
 class GuestAssertions {
-	constructor(script, directory, minutes = "10", reportFiles = "") {
+	constructor(source, directory, minutes = "10", reportFiles = "") {
 		if (!directory || !path.isAbsolute(directory)) {
 			throw new Error("Expected an absolute report directory");
 		}
@@ -18,9 +18,20 @@ class GuestAssertions {
 			);
 		}
 		this.timeout = Number(minutes) * 60000;
-		this.script = script;
+		this.source = source;
 		this.directory = directory;
 		this.guestReports = new GuestReports(reportFiles);
+	}
+
+	readCommand() {
+		const { command = "", script = "" } = this.source;
+		if (Boolean(command.trim()) === Boolean(script.trim()))
+			throw new Error("Provide exactly one of command or test-script");
+		const content = command.trim()
+			? command
+			: fs.readFileSync(new Workspace().file(script), "utf8");
+		if (!content.trim()) throw new Error("The test command must not be empty");
+		return content;
 	}
 
 	run(vm) {
@@ -28,12 +39,12 @@ class GuestAssertions {
 		this.reportFiles = [];
 		fs.mkdirSync(this.directory, { recursive: true });
 		const directory = fs.mkdtempSync(path.join(this.directory, "vm-test-"));
+		this.id = path.basename(directory);
 		const report = path.join(directory, "e2e.junit.xml");
 		const started = performance.now();
 		let failed = false;
 		try {
-			const script = fs.readFileSync(new Workspace().file(this.script), "utf8");
-			if (!script.trim()) throw new Error("The script must not be empty");
+			const command = this.readCommand();
 			const environment = this.guestReports.prepare(vm);
 			vm.command(
 				[
@@ -48,7 +59,7 @@ class GuestAssertions {
 				],
 				{
 					timeout: this.timeout,
-					input: script,
+					input: command,
 				},
 			);
 		} catch {
@@ -75,7 +86,7 @@ class GuestAssertions {
 				report,
 				'<?xml version="1.0" encoding="UTF-8"?>\n' +
 					`<testsuite name="disposable-vm" tests="1" failures="${failed ? 1 : 0}">` +
-					`<testcase name="consumer-script" time="${duration}">${failure}</testcase></testsuite>\n`,
+					`<testcase name="consumer-command" time="${duration}">${failure}</testcase></testsuite>\n`,
 				{ flag: "wx" },
 			);
 		} catch (error) {

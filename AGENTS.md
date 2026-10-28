@@ -5,7 +5,8 @@ Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/
 - Follow the [Make and workflow conventions](docs/development/contributing.md#make-and-workflow-conventions)
   from ci-github-container and workstation-manager when changing tooling.
 - Keep environment scenarios in consumers. This repository owns reusable validation
-  and focused disposable VM operations; workflows own orchestration and publication, while OCI publication remains in ci-github-container.
+  and focused disposable VM operations. Workflows own VM lifetime; vm/test composes
+  test execution and report publication. OCI publication remains in ci-github-container.
 - Use `actions/github-script` for action logic and native Actions helpers for outputs
   and failures. Put each action entrypoint in `index.cjs` beside its `action.yml`;
   keep only the module-loading call in YAML. Share JavaScript modules with local

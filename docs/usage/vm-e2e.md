@@ -5,10 +5,11 @@ Compose three actions in your CI job:
 | Action                                           | Responsibility                            | Handoff                                             |
 | ------------------------------------------------ | ----------------------------------------- | --------------------------------------------------- |
 | [vm/create](../../actions/vm/create/README.md)   | Install Lima and create an isolated guest | `vm` runtime directory and unique `id`              |
-| [vm/test](../../actions/vm/test/README.md)       | Run assertions and collect test reports   | `report` command status and optional `report-files` |
+| [vm/test](../../actions/vm/test/README.md)       | Run tests and publish reports             | `report` command status and optional `report-files` |
 | [vm/destroy](../../actions/vm/destroy/README.md) | Delete the guest and verify cleanup       | `removed: true` after successful cleanup            |
 
 Use an ephemeral Linux x86-64 runner with KVM and `contents: read`.
+Default GitHub reporting also needs `pull-requests: write` for PR comments.
 The VM actions use the Node runtime provided by `actions/github-script`; no Python
 or consumer package installation is needed. The shared report parser manages its own dependencies.
 Check out your repository with `persist-credentials: false`. Reserve a 90-minute
@@ -31,38 +32,24 @@ composition and failure assertions. A consumer job uses this sequence after chec
   uses: hoverkraft-tech/ci-github-iac/actions/vm/test@<same-reviewed-full-commit-sha>
   with:
     vm: ${{ steps.vm.outputs.vm }}
-    test-script: tests/e2e.sh
+    command: |
+      test -d /run/systemd/system
+      test "$(uname -s)" = Linux
+    report-name: Infrastructure VM tests
 - name: Destroy VM
   if: ${{ always() && steps.vm.outputs.vm != '' }}
   uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@<same-reviewed-full-commit-sha>
   with:
     vm: ${{ steps.vm.outputs.vm }}
-- name: Summarize assertion reports
-  if: ${{ always() && (steps.test.outputs.report != '' || steps.test.outputs.report-files != '') }}
-  uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
-  with:
-    report-name: VM assertions
-    report-paths: ${{ steps.test.outputs.report-files || steps.test.outputs.report }}
-    output-format: summary,annotations
-- name: Upload assertion reports
-  if: ${{ always() && (steps.test.outputs.report != '' || steps.test.outputs.report-files != '') }}
-  uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-  with:
-    name: vm-${{ github.job }}-${{ steps.vm.outputs.id }}
-    path: |
-      ${{ steps.test.outputs.report }}
-      ${{ steps.test.outputs.report-files }}
-    if-no-files-found: error
-    retention-days: 7
 # jscpd:ignore-end
 ```
 
 Keep the `always()` cleanup condition and do not suppress cleanup failures.
 Creation rolls back partial startup itself; explicit destruction also retries
-cleanup when creation has exported its runtime directory. Report parsing and upload
-run after destruction, so reporting failures cannot prevent cleanup. The workflow
-owns summaries, annotations, upload conditions, naming and retention. Test execution
-and collection determine the action's outcome; report rendering does not suppress failures.
+cleanup when creation has exported its runtime directory. The test action owns
+report parsing, PR comments and upload. These steps run even after test failure;
+workflow destruction follows the action and still runs if reporting fails. Testing
+never destroys the guest, so callers can execute more test steps before cleanup.
 Do not upload the VM directory.
 
 ## Configure the scenario
@@ -76,12 +63,15 @@ repository as a starting point. It uses a digest-pinned Ubuntu image with 2 CPUs
 SSH agent forwarding and dynamic port forwarding. Lima provisioning still runs;
 treat configuration and scripts as trusted repository code.
 
-`vm/test` accepts `vm`, a required `test-script`, `test-timeout-minutes` from 1 to
-40 (default 10), and optional `report-file` patterns. The script must be
-nonempty and inside the checkout. It runs in guest Bash with `-euo pipefail`,
+`vm/test` accepts `vm` and exactly one of `command` or `test-script`. Use
+`command` for one or more Bash commands, including a YAML multiline block. Use
+`test-script` to send a nonempty Bash file from the checkout to the guest. Both
+run in guest Bash with `-euo pipefail`,
 standard input and `/tmp` as its working directory. Checkout files and host
 environment variables are not copied into the guest. Scripts must be self-contained
-or obtain synthetic fixtures themselves. Nonzero exit and timeout fail the action.
+or obtain synthetic fixtures themselves. A command may change directory to
+guest code prepared through the VM configuration. `test-timeout-minutes` is an
+integer from 1 to 40 (default 10). Nonzero exit and timeout fail the action.
 
 Testing leaves the VM running, allowing additional assertions or diagnostics
 before destruction. Each invocation keeps its own host reports under `runner.temp`;
@@ -93,7 +83,7 @@ preserving any completed guest reports. Startup failures skip testing and emit n
 ## Collect test and coverage reports
 
 The reporting pattern follows [Hoverkraft's Node.js test action](https://github.com/hoverkraft-tech/ci-github-nodejs/tree/main/actions/test):
-select report files and delegate parsing to `ci-github-common/actions/parse-ci-reports`.
+select report files and compose parsing, PR comments and uploads in the test action.
 To collect files produced by your test tools, set `report-file` on `vm/test`:
 
 ```yaml
@@ -125,13 +115,39 @@ dumps and private logs from reports published by these public workflows. Raw VM
 command output is never collected. See the maintained [success fixture](../../tests/fixture/assert.sh)
 and [failure fixture](../../tests/fixture/fail.sh) for examples.
 
-Feed `report-files` to the shared parser, falling back to `report` when no guest
-reports are available, as shown above. This avoids counting the command wrapper
-as an extra framework test. Keep both outputs in the uploaded artifact. The parser
-supports JUnit, coverage and other standard CI formats; set its `path-mapping`
-input when reports reference guest paths that differ from checkout paths.
-When combining test steps, pass their explicit paths together; separate uploads
-need distinct artifact names. No report-directory scan is needed on the host.
+## Publish results
+
+The `coverage` input selects the reporter:
+
+| Value              | Behavior                                                                                    | Job permission                      |
+| ------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `github` (default) | Parse collected reports, write summaries and annotations, and create or update a PR comment | `pull-requests: write` for comments |
+| `codecov`          | Upload explicitly collected reports to Codecov using OIDC                                   | `id-token: write`                   |
+| `""`               | Skip coverage parsing, comments and Codecov                                                 | No additional permission            |
+
+GitHub mode reuses Hoverkraft's `parse-ci-reports` and
+`create-or-update-comment` actions. It parses collected `report-files`, falling
+back to the command-status `report` when none are available. Set `path-mapping`
+to translate guest paths to checkout paths. Outputs `summary`, `markdown` and
+`parsed-files` expose the parser results.
+
+Set a distinct, stable `report-name` for every test step and matrix scenario; it
+is the summary heading and comment lookup key. Reruns update that comment.
+Comments run only on same-repository pull requests, excluding Dependabot;
+fork PRs still receive summaries and artifacts. `github-token` defaults to
+`github.token`. Do not use `pull_request_target` to execute untrusted tests.
+
+Codecov mode requires explicit `report-file` selection and a repository enabled
+in Codecov. It uses the same pinned Codecov action as the Node.js reference, with
+file discovery disabled so only collected guest reports are sent. It does not
+upload the generated command-status wrapper. Configure Codecov path fixes if guest
+source paths differ from repository paths. Upload errors fail the action.
+
+Every mode uploads completed status and guest reports as a GitHub artifact with
+an invocation-specific name and seven-day retention. `artifact-id` identifies
+that upload. Artifact upload still runs after parser, comment or Codecov errors;
+earlier test failures remain failures. Reports contain original tool output, so
+choose only public-safe files. No extra reporting steps are needed in the workflow.
 
 ## Cleanup and local runs
 
@@ -154,8 +170,10 @@ node /path/to/ci-github-iac/actions/vm/cli.cjs run --vm-config tests/lima.yml --
 
 This local command composes the same implementations with guaranteed cleanup
 attempts. Each test writes to a separate subdirectory of `.reports` and prints
-all completed report paths, including on assertion failure. Both `--vm-config`
-and `--test-script` are required. Optional arguments are `--report-file`, `--report-directory` (a directory within the checkout) and
+all completed report paths, including on assertion failure. `--vm-config` is
+required, together with exactly one of `--command` or `--test-script`. Local runs
+execute tests and collect files; GitHub reporting and uploads run only in CI.
+Optional arguments are `--report-file`, `--report-directory` (a directory within the checkout) and
 `--test-timeout-minutes`. Retained local reports can be removed when no longer
 needed. To retry failed cleanup, use the printed runtime path:
 

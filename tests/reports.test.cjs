@@ -149,7 +149,12 @@ test("test failures and timeouts still collect reports before guest report clean
 		}
 		return execute(args);
 	});
-	const assertions = new GuestAssertions("assert.sh", directory, "1", "*.xml");
+	const assertions = new GuestAssertions(
+		{ script: "assert.sh" },
+		directory,
+		"1",
+		"*.xml",
+	);
 	assert.throws(() => assertions.run(vm));
 	assert.equal(assertions.reportFiles.length, 1);
 	assert.ok(fs.existsSync(assertions.reportFiles[0]));
@@ -160,7 +165,7 @@ test("test failures and timeouts still collect reports before guest report clean
 test("collection failure fails successful assertions and cleans the guest report directory", (t) => {
 	const { directory, guest, vm } = assertionFixture(t);
 	const assertions = new GuestAssertions(
-		"assert.sh",
+		{ script: "assert.sh" },
 		directory,
 		"1",
 		"missing.xml",
@@ -186,7 +191,12 @@ test("completed guest reports survive a command-status report write failure", (t
 		write(filename, "partial");
 		throw new Error("synthetic report write failure");
 	});
-	const assertions = new GuestAssertions("assert.sh", directory, "1", "*.xml");
+	const assertions = new GuestAssertions(
+		{ script: "assert.sh" },
+		directory,
+		"1",
+		"*.xml",
+	);
 	assert.throws(() => assertions.run(vm));
 	assert.equal(assertions.report, undefined);
 	assert.equal(assertions.reportFiles.length, 1);

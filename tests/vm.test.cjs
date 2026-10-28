@@ -31,7 +31,10 @@ function fixture(t) {
 function completedTest(t) {
 	const environment = fixture(t);
 	const command = t.mock.method(environment.vm, "command", () => "");
-	const assertions = new GuestAssertions("assert.sh", environment.reports);
+	const assertions = new GuestAssertions(
+		{ script: "assert.sh" },
+		environment.reports,
+	);
 	assertions.run(environment.vm);
 	return {
 		...environment,
@@ -190,10 +193,14 @@ test("failed rollback preserves the recovery directory", (t) => {
 test("reports require a resolved directory and a bounded deadline", (t) => {
 	const { reports } = fixture(t);
 	for (const directory of [undefined, "", ".reports"]) {
-		assert.throws(() => new GuestAssertions("assert.sh", directory));
+		assert.throws(
+			() => new GuestAssertions({ script: "assert.sh" }, directory),
+		);
 	}
 	for (const minutes of ["0", "41", "-1", "1.5", "nan", ""]) {
-		assert.throws(() => new GuestAssertions("assert.sh", reports, minutes));
+		assert.throws(
+			() => new GuestAssertions({ script: "assert.sh" }, reports, minutes),
+		);
 	}
 });
 
@@ -220,14 +227,16 @@ test("local report destinations cannot escape the checkout", (t) => {
 test("invalid settings preserve earlier reports without creating files", (t) => {
 	const { reports, report, content } = completedTest(t);
 	const directories = fs.readdirSync(reports);
-	assert.throws(() => new GuestAssertions("assert.sh", reports, "invalid"));
+	assert.throws(
+		() => new GuestAssertions({ script: "assert.sh" }, reports, "invalid"),
+	);
 	assert.deepEqual(fs.readdirSync(reports), directories);
 	assert.equal(fs.readFileSync(report, "utf8"), content);
 });
 
 test("assertions reach guest stdin with a deadline and leave the VM intact", (t) => {
 	const { vm, reports } = fixture(t);
-	const assertions = new GuestAssertions("assert.sh", reports, "3");
+	const assertions = new GuestAssertions({ script: "assert.sh" }, reports, "3");
 	const command = t.mock.method(vm, "command", () => "");
 	assertions.run(vm);
 	assert.deepEqual(command.mock.calls[0].arguments, [
@@ -242,9 +251,34 @@ test("assertions reach guest stdin with a deadline and leave the VM intact", (t)
 	);
 });
 
+test("multiline commands reach guest stdin without host expansion", (t) => {
+	const { vm, reports } = fixture(t);
+	const command = 'test -d /run/systemd/system\nprintf "%s" "$GUEST_VALUE"\n';
+	const execute = t.mock.method(vm, "command", () => "");
+	const assertions = new GuestAssertions({ command }, reports);
+	assertions.run(vm);
+	assert.equal(execute.mock.calls[0].arguments[1].input, command);
+	assert.match(fs.readFileSync(assertions.report, "utf8"), /failures="0"/);
+});
+
+test("missing or conflicting command inputs fail before guest execution", (t) => {
+	const { vm, reports } = fixture(t);
+	const execute = t.mock.method(vm, "command", () => "");
+	for (const source of [
+		{},
+		{ command: " \n" },
+		{ command: "true", script: "assert.sh" },
+	]) {
+		const assertions = new GuestAssertions(source, reports);
+		assert.throws(() => assertions.run(vm));
+		assert.match(fs.readFileSync(assertions.report, "utf8"), /failures="1"/);
+	}
+	assert.equal(execute.mock.callCount(), 0);
+});
+
 test("failed and timed out assertions produce redacted failure evidence", (t) => {
 	const { vm, reports } = fixture(t);
-	const assertions = new GuestAssertions("assert.sh", reports);
+	const assertions = new GuestAssertions({ script: "assert.sh" }, reports);
 	for (const error of [
 		new Error("secret-output"),
 		Object.assign(new Error("secret"), { code: "ETIMEDOUT" }),
@@ -272,7 +306,7 @@ test("invalid scripts fail without guest execution", (t) => {
 		"../outside.sh",
 		"external.sh",
 	]) {
-		const assertions = new GuestAssertions(script, reports);
+		const assertions = new GuestAssertions({ script }, reports);
 		assert.throws(() => assertions.run(vm));
 		assert.match(fs.readFileSync(assertions.report, "utf8"), /failures="1"/);
 	}
@@ -421,7 +455,7 @@ test("test action exports a failed report while preserving the guest", (t) => {
 	});
 	const { outputs, failures } = runAction(t, "test", {
 		VM_DIRECTORY: vm.home,
-		TEST_SCRIPT: "assert.sh",
+		TEST_COMMAND: "false\n",
 		RUNNER_TEMP: path.join(root, "runner temp"),
 		TEST_TIMEOUT_MINUTES: "1",
 	});
@@ -430,11 +464,33 @@ test("test action exports a failed report while preserving the guest", (t) => {
 		path.join(root, "runner temp"),
 	);
 	assert.equal(fs.existsSync(path.join(root, ".reports")), false);
+	assert.equal(outputs.id, path.basename(path.dirname(outputs.report)));
 	assert.equal(failures.length, 1);
 	assert.equal(failures[0].includes("secret"), false);
 	assert.match(fs.readFileSync(outputs.report, "utf8"), /failures="1"/);
 	assert.ok(fs.existsSync(vm.home));
 });
+
+for (const coverage of ["unknown", "codecov"]) {
+	test(`${coverage} coverage without valid report settings fails before guest execution`, (t) => {
+		const { root, vm } = fixture(t);
+		const command = t.mock.method(
+			VirtualMachine.prototype,
+			"command",
+			() => "",
+		);
+		const { outputs, failures } = runAction(t, "test", {
+			VM_DIRECTORY: vm.home,
+			TEST_COMMAND: "true",
+			RUNNER_TEMP: root,
+			COVERAGE: coverage,
+			REPORT_FILE: "",
+		});
+		assert.deepEqual(outputs, {});
+		assert.equal(failures.length, 1);
+		assert.equal(command.mock.callCount(), 0);
+	});
+}
 
 test("report write failures fail the action and allow local cleanup", (t) => {
 	const { root, vm, reports } = fixture(t);
@@ -456,7 +512,7 @@ test("report write failures fail the action and allow local cleanup", (t) => {
 	assert.throws(() =>
 		localRun(
 			VirtualMachine.template("guest.yml"),
-			new GuestAssertions("assert.sh", reports),
+			new GuestAssertions({ script: "assert.sh" }, reports),
 		),
 	);
 	assert.equal(fs.existsSync(vm.home), false);

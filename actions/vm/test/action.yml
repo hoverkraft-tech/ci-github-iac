@@ -1,8 +1,8 @@
-# Execute assertions, collect selected guest reports and write command-status JUnit.
+# Execute guest tests, collect reports and publish coverage results.
 # See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ---
 name: VM - Test
-description: Run guest assertions and collect test reports for Hoverkraft CI reporting.
+description: Run guest test commands, parse reports, comment on pull requests and upload results.
 author: Hoverkraft
 branding:
   icon: check-circle
@@ -11,19 +11,39 @@ inputs:
   vm:
     description: Private runtime directory returned by vm/create.
     required: true
+  command:
+    description: |
+      Bash command or multiline commands to execute inside the guest from /tmp.
+      Provide exactly one of command or test-script. Checkout files are not mounted in the guest.
+    default: ""
   test-script:
-    description: Nonempty Bash script in the checkout to execute inside the guest.
-    required: true
+    description: Nonempty Bash script in the checkout to send to the guest instead of command.
+    default: ""
   test-timeout-minutes:
-    description: Guest script timeout, from 1 to 40 minutes.
+    description: Guest command timeout, from 1 to 40 minutes.
     default: "10"
   report-file:
     description: |
       Optional report paths or glob patterns relative to the guest REPORTS_DIR.
       Separate patterns with newlines, commas or semicolons. Every pattern must match.
-      The script receives a fresh REPORTS_DIR; matched files are collected even after test failure.
+      Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.
       Report contents are preserved. Use only reports suitable for public CI.
     default: ""
+  coverage:
+    description: |
+      Coverage reporter; github for summaries and PR comments, codecov for upload,
+      or empty to disable reporting. Report artifacts are always retained.
+      Codecov requires report-file selection and id-token write permission for OIDC.
+    default: github
+  report-name:
+    description: Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.
+    default: VM test results
+  path-mapping:
+    description: Optional path mappings forwarded to Hoverkraft's report parser.
+    default: ""
+  github-token:
+    description: Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped.
+    default: ${{ github.token }}
 outputs:
   report:
     description: Absolute path of the sanitized command-status JUnit report, including on assertion or collection failure.
@@ -31,17 +51,72 @@ outputs:
   report-files:
     description: Newline-separated absolute paths of completed guest report files. Empty when collection is disabled or fails.
     value: ${{ steps.test.outputs.report-files }}
+  summary:
+    description: Parsed test and coverage summary in github mode.
+    value: ${{ steps.parse-coverage-reports.outputs.summary }}
+  markdown:
+    description: Markdown used for the coverage PR comment in github mode.
+    value: ${{ steps.parse-coverage-reports.outputs.markdown }}
+  parsed-files:
+    description: JSON array of report files parsed in github mode.
+    value: ${{ steps.parse-coverage-reports.outputs.parsed-files }}
+  artifact-id:
+    description: Uploaded report artifact identifier.
+    value: ${{ steps.upload.outputs.artifact-id }}
 runs:
   using: composite
   steps:
-    - name: Execute guest assertions
+    - name: Run tests
       id: test
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         VM_ACTION_PATH: ${{ github.action_path }}
         VM_DIRECTORY: ${{ inputs.vm }}
+        TEST_COMMAND: ${{ inputs.command }}
         TEST_SCRIPT: ${{ inputs.test-script }}
         TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
         REPORT_FILE: ${{ inputs.report-file }}
+        COVERAGE: ${{ inputs.coverage }}
       with:
         script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });
+
+    - name: Parse coverage reports
+      if: ${{ always() && inputs.coverage == 'github' && (steps.test.outputs.report-files != '' || steps.test.outputs.report != '') }}
+      id: parse-coverage-reports
+      uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+      with:
+        report-name: ${{ inputs.report-name }}
+        report-paths: ${{ steps.test.outputs.report-files || steps.test.outputs.report }}
+        path-mapping: ${{ inputs.path-mapping }}
+        output-format: summary,markdown,annotations
+
+    - name: Add coverage PR comment
+      if: >-
+        ${{ always() && inputs.coverage == 'github' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.parse-coverage-reports.outputs.markdown != '' }}
+      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+      with:
+        title: ${{ inputs.report-name }}
+        body: ${{ steps.parse-coverage-reports.outputs.markdown }}
+        token: ${{ inputs.github-token }}
+
+    - name: Upload coverage to Codecov
+      if: ${{ always() && inputs.coverage == 'codecov' && steps.test.outputs.codecov-files != '' }}
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+      with:
+        files: ${{ steps.test.outputs.codecov-files }}
+        disable_search: true
+        use_oidc: true
+        disable_telem: true
+        fail_ci_if_error: true
+
+    - name: Upload test and coverage reports
+      if: ${{ always() && (steps.test.outputs.report-files != '' || steps.test.outputs.report != '') }}
+      id: upload
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ steps.test.outputs.id }}
+        path: |
+          ${{ steps.test.outputs.report }}
+          ${{ steps.test.outputs.report-files }}
+        if-no-files-found: error
+        retention-days: 7
