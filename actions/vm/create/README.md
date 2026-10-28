@@ -25,7 +25,7 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@dced70c9039bddd0b5903c5eb2e61c1ee2e0db9b # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@b6e661ba5052745785421322db85f925ca1cde9d # feat/phase-1-bootstrap
   with:
     # Path to a Lima YAML file in the checkout. Plain mode is enforced.
     # This input is required.
