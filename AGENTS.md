@@ -2,6 +2,8 @@
 
 Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/.github/blob/main/AGENTS.md).
 
+- Follow the [Make and workflow conventions](docs/development/contributing.md#make-and-workflow-conventions)
+  from ci-github-container and workstation-manager when changing tooling.
 - Keep environment scenarios in consumers. This repository owns reusable validation
   and disposable VM lifecycle orchestration; OCI publication remains in ci-github-container.
 - Use synthetic fixtures without account credentials. Never upload VM disks, state,

@@ -1,9 +1,35 @@
 # Validation and releases
 
+## Make and workflow conventions
+
+Follow the [Hoverkraft Makefile](https://github.com/hoverkraft-tech/ci-github-container/blob/main/Makefile)
+and [workflow layout](https://github.com/hoverkraft-tech/ci-github-container/tree/main/.github/workflows).
+Use annotated Make targets for generated help and a shared `run_linter` helper
+for `lint` and `lint-fix`. The container uses Linux amd64, the caller's UID/GID,
+and the checkout's absolute path for its workspace. A failed image build stops
+the command before linting.
+
+`make help` lists commands. `make lint-fix` applies supported automatic fixes;
+`make lint docs/` limits linting to matching paths. Positional filters are accepted
+only for lint commands; unknown standalone targets still fail. `make ci` runs
+`lint-fix` and unit tests locally. Run the VM lifecycle separately with `make e2e`.
+
+Internal `__main-ci.yml` and `__pull-request-ci.yml` call `__shared-ci.yml`.
+Main supports pushes and manual runs; PR CI also supports merge queues. Both
+cancel superseded runs for the same workflow and ref. The reusable public
+workflow remains `vm-e2e.yml`, with cleanup and report collection after failures.
+Workflows start with `permissions: {}` and grant only the permissions required by
+each job. Keep Actions pinned and step names descriptive. The aggregate `checks`
+job requires every prerequisite to succeed and is required by branch protection.
+
+## Validation
+
 Run `make test` for failure, cleanup and report contracts, `make lint` for the
 Hoverkraft containerized linter, and `make e2e` on a KVM-capable host for actual
 VM behavior. PR CI runs these checks with the same Make entrypoints for tests
 and lifecycle operations. Do not replace a boot check with mocked CLI output.
+
+## Releases and dependencies
 
 Use Conventional Commits and a reviewed pull request. Publish semantic versions
 only after CI and consumer validation pass: major for incompatible contracts,

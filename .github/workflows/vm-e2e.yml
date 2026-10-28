@@ -1,6 +1,7 @@
 # Boot a disposable Lima VM through the consumer's Make lifecycle. Assertions,
 # diagnostic collection and teardown remain consumer-owned. Only synthetic,
 # explicitly sanitized artifacts may be published from this public workflow.
+---
 name: VM end-to-end validation
 on:
   workflow_call:
@@ -17,10 +18,12 @@ on:
         description: Assertion time limit; cleanup has a separate time allowance.
         type: number
         default: 10
-permissions:
-  contents: read
+permissions: {}
+
 jobs:
   vm:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 90
     defaults:
