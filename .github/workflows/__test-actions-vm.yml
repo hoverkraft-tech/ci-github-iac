@@ -16,13 +16,13 @@ jobs:
           - scenario: success
             report-file: ""
             script: tests/fixture/assert.sh
-            config: ""
+            config: tests/fixture/lima.yml
             create-outcome: success
             test-outcome: success
           - scenario: assertion-failure
             report-file: "*.xml"
             script: tests/fixture/fail.sh
-            config: ""
+            config: tests/fixture/lima.yml
             create-outcome: success
             test-outcome: failure
           - scenario: startup-failure

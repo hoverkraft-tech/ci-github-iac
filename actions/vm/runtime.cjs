@@ -16,9 +16,9 @@ class VirtualMachine {
 	}
 
 	static template(config) {
-		return config
-			? new Workspace().file(config)
-			: path.join(__dirname, "create/lima.yml");
+		if (typeof config !== "string" || !config.trim())
+			throw new Error("vm-config is required");
+		return new Workspace().file(config);
 	}
 
 	validateRuntime() {

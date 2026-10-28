@@ -24,6 +24,8 @@ composition and failure assertions. A consumer job uses this sequence after chec
 - name: Create VM
   id: vm
   uses: hoverkraft-tech/ci-github-iac/actions/vm/create@<reviewed-full-commit-sha>
+  with:
+    vm-config: tests/lima.yml
 - name: Execute guest assertions
   id: test
   uses: hoverkraft-tech/ci-github-iac/actions/vm/test@<same-reviewed-full-commit-sha>
@@ -65,9 +67,12 @@ Do not upload the VM directory.
 
 ## Configure the scenario
 
-`vm/create` accepts an optional `vm-config` YAML file within the checkout.
-The [bundled template](../../actions/vm/create/lima.yml) uses a digest-pinned Ubuntu
-image with 2 CPUs, 2 GiB RAM and a 10 GiB disk. Plain mode disables host mounts,
+`vm/create` requires `vm-config`, the path to an existing Lima YAML file within
+your checkout. Missing or blank input fails before allocating a VM runtime.
+The consumer owns the image and resource settings; the action supplies no default
+configuration. Copy the [test fixture](../../tests/fixture/lima.yml) into your
+repository as a starting point. It uses a digest-pinned Ubuntu image with 2 CPUs,
+2 GiB RAM and a 10 GiB disk. Plain mode is always enforced and disables host mounts,
 SSH agent forwarding and dynamic port forwarding. Lima provisioning still runs;
 treat configuration and scripts as trusted repository code.
 
@@ -106,8 +111,8 @@ digits, spaces, dots, underscores or hyphens. Absolute paths and parent traversa
 are rejected, and symbolic links are excluded.
 
 Every requested pattern must match a nonempty regular file. Collection is limited
-to 100 files, 20 MiB total and two minutes. Custom guests need Bash, GNU find and
-an SSH file-copy service; the bundled Ubuntu guest provides them. Collection is
+to 100 files, 20 MiB total and two minutes. Guests need Bash, GNU find and
+an SSH file-copy service; the Ubuntu test fixture provides them. Collection is
 attempted after assertion failure or timeout, before removing the guest report
 directory. Missing files, incomplete transfers and cleanup errors fail the action.
 An incomplete collection exports no guest files; the command-status report records
@@ -144,13 +149,13 @@ access to `/dev/kvm` and outbound network access. Lima's version is maintained i
 [creation metadata](../../actions/vm/create/action.yml). From a consumer checkout:
 
 ```sh
-node /path/to/ci-github-iac/actions/vm/cli.cjs run --test-script tests/e2e.sh
+node /path/to/ci-github-iac/actions/vm/cli.cjs run --vm-config tests/lima.yml --test-script tests/e2e.sh
 ```
 
 This local command composes the same implementations with guaranteed cleanup
 attempts. Each test writes to a separate subdirectory of `.reports` and prints
-all completed report paths, including on assertion failure. Options are
-`--vm-config`, `--report-file`, `--report-directory` (a directory within the checkout) and
+all completed report paths, including on assertion failure. Both `--vm-config`
+and `--test-script` are required. Optional arguments are `--report-file`, `--report-directory` (a directory within the checkout) and
 `--test-timeout-minutes`. Retained local reports can be removed when no longer
 needed. To retry failed cleanup, use the printed runtime path:
 

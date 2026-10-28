@@ -15,6 +15,7 @@ function fixture(t) {
 	const previousDirectory = process.cwd();
 	process.chdir(root);
 	const vm = VirtualMachine.allocate();
+	fs.writeFileSync(path.join(root, "guest.yml"), "cpus: 1\n");
 	fs.writeFileSync(
 		path.join(root, "assert.sh"),
 		"test -d /run/systemd/system\n",
@@ -96,10 +97,18 @@ test("shared, unmanaged and symlinked runtimes are rejected", (t) => {
 test("configuration must be a checkout file", (t) => {
 	const { root } = fixture(t);
 	fs.symlinkSync(
-		path.join(backend, "create/lima.yml"),
+		path.join(__dirname, "fixture/lima.yml"),
 		path.join(root, "external.yml"),
 	);
-	for (const config of ["missing.yml", "../outside.yml", "external.yml", "."]) {
+	for (const config of [
+		undefined,
+		"",
+		" \n",
+		"missing.yml",
+		"../outside.yml",
+		"external.yml",
+		".",
+	]) {
 		assert.throws(() => VirtualMachine.template(config));
 	}
 });
@@ -107,7 +116,6 @@ test("configuration must be a checkout file", (t) => {
 test("create accepts configuration without assertion or report inputs", (t) => {
 	const { root, vm } = fixture(t);
 	const config = path.join(root, "guest.yml");
-	fs.writeFileSync(config, "cpus: 1\n");
 	const command = t.mock.method(vm, "command", () => "");
 	vm.create(VirtualMachine.template("guest.yml"));
 	assert.ok(command.mock.calls[0].arguments[0].includes(config));
@@ -116,11 +124,38 @@ test("create accepts configuration without assertion or report inputs", (t) => {
 	assert.equal(fs.existsSync(path.join(root, ".reports")), false);
 });
 
+test("creation action rejects empty configuration before allocating a runtime", (t) => {
+	const allocate = t.mock.method(VirtualMachine, "allocate", () => {
+		throw new Error("Unexpected allocation");
+	});
+	const { outputs, failures } = runAction(t, "create", { VM_CONFIG: "" });
+	assert.deepEqual(outputs, {});
+	assert.equal(failures.length, 1);
+	assert.match(failures[0], /required vm-config/);
+	assert.equal(allocate.mock.callCount(), 0);
+});
+
+test("local runs require explicit configuration before allocating a runtime", (t) => {
+	const { reports } = fixture(t);
+	for (const args of [[], ["--vm-config", ""], ["--vm-config", " \n"]]) {
+		const run = childProcess.spawnSync(process.execPath, [
+			path.join(backend, "cli.cjs"),
+			"run",
+			"--test-script",
+			"assert.sh",
+			...args,
+		]);
+		assert.equal(run.status, 1);
+		assert.equal(run.stdout.toString(), "");
+	}
+	assert.equal(fs.existsSync(reports), false);
+});
+
 test("repeated creation refuses to reuse or delete a running VM", (t) => {
 	const { vm } = fixture(t);
 	t.mock.method(vm, "exists", () => true);
 	const command = t.mock.method(vm, "command");
-	assert.throws(() => vm.create(VirtualMachine.template("")));
+	assert.throws(() => vm.create(VirtualMachine.template("guest.yml")));
 	assert.equal(command.mock.callCount(), 0);
 });
 
@@ -132,7 +167,7 @@ test("failed creation rolls back its partial guest", (t) => {
 		if (args[0] === "start") throw new Error("synthetic failure");
 		return "";
 	});
-	assert.throws(() => vm.create(VirtualMachine.template("")));
+	assert.throws(() => vm.create(VirtualMachine.template("guest.yml")));
 	assert.deepEqual(command.mock.calls.at(-1).arguments[0], [
 		"delete",
 		"--force",
@@ -148,7 +183,7 @@ test("failed rollback preserves the recovery directory", (t) => {
 	t.mock.method(vm, "command", () => {
 		throw new Error("synthetic failure");
 	});
-	assert.throws(() => vm.create(VirtualMachine.template("")));
+	assert.throws(() => vm.create(VirtualMachine.template("guest.yml")));
 	assert.ok(fs.existsSync(vm.home));
 });
 
@@ -173,6 +208,8 @@ test("local report destinations cannot escape the checkout", (t) => {
 			"assert.sh",
 			"--report-directory",
 			directory,
+			"--vm-config",
+			"guest.yml",
 		]);
 		assert.equal(run.status, 1);
 		assert.equal(run.stdout.toString(), "");
@@ -352,7 +389,9 @@ test("local composition attempts cleanup after startup and test failures", (t) =
 		t.mock.method(vm, "create", () => invoke("create"));
 		t.mock.method(vm, "destroy", () => invoke("destroy"));
 		assert.throws(() =>
-			localRun(VirtualMachine.template(""), { run: () => invoke("test") }),
+			localRun(VirtualMachine.template("guest.yml"), {
+				run: () => invoke("test"),
+			}),
 		);
 		assert.equal(trace.at(-1), "destroy");
 		assert.equal(trace.includes("test"), failed !== "create");
@@ -365,7 +404,9 @@ test("creation action exports recovery outputs before failed startup", (t) => {
 	t.mock.method(vm, "command", () => {
 		throw new Error("secret-output");
 	});
-	const { outputs, failures } = runAction(t, "create", { VM_CONFIG: "" });
+	const { outputs, failures } = runAction(t, "create", {
+		VM_CONFIG: "guest.yml",
+	});
 	assert.equal(outputs.vm, vm.home);
 	assert.equal(outputs.id, path.basename(vm.home));
 	assert.equal(failures.length, 1);
@@ -414,7 +455,7 @@ test("report write failures fail the action and allow local cleanup", (t) => {
 	t.mock.method(console, "info", () => {});
 	assert.throws(() =>
 		localRun(
-			VirtualMachine.template(""),
+			VirtualMachine.template("guest.yml"),
 			new GuestAssertions("assert.sh", reports),
 		),
 	);

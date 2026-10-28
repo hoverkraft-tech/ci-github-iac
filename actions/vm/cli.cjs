@@ -23,7 +23,7 @@ function main() {
 			allowPositionals: true,
 			options: {
 				vm: { type: "string", default: "" },
-				"vm-config": { type: "string", default: "" },
+				"vm-config": { type: "string" },
 				"test-script": { type: "string", default: "" },
 				"report-directory": { type: "string", default: ".reports" },
 				"report-file": { type: "string", default: "" },

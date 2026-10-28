@@ -10,7 +10,7 @@ module.exports = ({ core }) => {
 		vm.create(template);
 	} catch {
 		core.setFailed(
-			"VM creation failed. Retry cleanup using the runtime directory if allocated.",
+			"VM creation failed. Check the required vm-config checkout file and retry cleanup using the runtime directory if allocated.",
 		);
 	}
 };

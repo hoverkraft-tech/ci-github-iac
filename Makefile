@@ -34,7 +34,7 @@ docs: ## Generate action documentation
 	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/vm/create/action.yml actions/vm/test/action.yml actions/vm/destroy/action.yml --repository git
 
 e2e: ## Run guest assertions with automatic VM setup and cleanup
-	node actions/vm/cli.cjs run --test-script tests/fixture/assert.sh
+	node actions/vm/cli.cjs run --vm-config tests/fixture/lima.yml --test-script tests/fixture/assert.sh
 
 #############################
 # Helpers

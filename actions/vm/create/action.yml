@@ -9,8 +9,8 @@ branding:
   color: purple
 inputs:
   vm-config:
-    description: Optional Lima YAML file in the checkout; defaults to pinned Ubuntu. Plain mode is enforced.
-    default: ""
+    description: Path to a Lima YAML file in the checkout. Plain mode is enforced.
+    required: true
 outputs:
   vm:
     description: Private Lima runtime directory for subsequent VM actions; allocated before startup.
