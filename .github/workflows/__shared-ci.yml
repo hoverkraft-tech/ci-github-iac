@@ -36,9 +36,14 @@ jobs:
       contents: read
       pull-requests: write
     uses: $/.github/workflows/__test-actions-vm.yml
+  ansible:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: $/.github/workflows/__test-actions-ansible.yml
   checks:
     if: ${{ always() }}
-    needs: [tests, linter, vm]
+    needs: [tests, linter, vm, ansible]
     runs-on: ubuntu-latest
     steps:
       - name: Require all checks

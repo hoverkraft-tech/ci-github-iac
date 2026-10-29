@@ -14,7 +14,7 @@
 
 ## Overview
 
-GitHub Actions for testing infrastructure changes in disposable virtual machines.
+GitHub Actions for validating Ansible and testing infrastructure changes in disposable virtual machines.
 Create a Lima and QEMU guest from your configuration, run your checks, publish
 test and coverage reports, and verify that the guest is removed afterward.
 
@@ -23,6 +23,13 @@ handle VM operations and reporting; your workflow controls their sequence and
 can run several test steps against the same guest.
 
 ## Actions
+
+### Ansible
+
+#### - [Test Ansible](actions/ansible/test/README.md)
+
+Validate playbook syntax and first-party collection sanity using your tooling
+image. Publish check summaries, annotations, PR comments and report artifacts.
 
 ### Virtual machines
 
@@ -44,7 +51,11 @@ cleanup remains visible and preserves the runtime for a retry.
 
 ## Getting started
 
-Use an ephemeral Linux x86-64 runner with KVM and network access. Check out your
+For Ansible, check out your repository and build or pull its Ansible tooling image
+on a Linux runner with Docker. Pass the image and playbook or collection paths to
+[ansible/test](actions/ansible/test/README.md).
+
+For VMs, use an ephemeral Linux x86-64 runner with KVM and network access. Check out your
 repository with `persist-credentials: false`, and provide a Lima YAML configuration
 and Bash test commands or a script. Checkout files are not mounted into the guest.
 
