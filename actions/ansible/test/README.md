@@ -27,7 +27,7 @@ No Makefile or reporting script is required. The image's entrypoint is replaced.
 
 ```yaml
 - name: Test Ansible
-  uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@7bb6c22d7e9a9eded70627a001ea880a033e100d
+  uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@d2673efa2d13247d9a7ccf9fc2b6876fbf2d3435
   with:
     container-image: my-project-tooling:local
     playbooks: ansible/site.yml
