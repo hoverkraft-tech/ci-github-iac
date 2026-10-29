@@ -4,7 +4,8 @@
 	"ignore": [
 		"**/__snapshots__/**",
 		"**/node_modules/**",
-		"actions/**/README.md"
+		"actions/**/README.md",
+		".github/social-preview.svg"
 	],
 	"absolute": true
 }

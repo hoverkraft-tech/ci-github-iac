@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="264" viewBox="0 0 256 264" role="img" aria-labelledby="logo-title logo-description">
+<title id="logo-title">CI GitHub IaC</title>
+<desc id="logo-description">Three white connected infrastructure nodes between code brackets, on the Hoverkraft blue project square and slate wave.</desc>
+<!-- Project-square geometry and colors: https://github.com/hoverkraft-tech/branding/blob/c2090278bc389b170ac04dcc7685eabb87eca032/brand/identity/logos/logo-project.svg -->
+<rect x="6.3385172" y="8.1042032" width="241.36835" height="247.86084" ry="17.481256" fill="#1998ff" />
+<g fill="#506690">
+  <rect x="6.3635287" y="214.77875" width="241.38019" height="41.468822" ry="17.481256" />
+  <path d="m 247.67244,230.81893 -0.0483,-15.32094 c -0.022,-6.98321 -27.35297,-18.91692 -43.36154,-17.92354 -6.6801,0.41452 -14.53817,0.36281 -49.53107,14.16878 -28.35454,11.18689 -34.96193,-30.26526 -70.015148,-7.92166 -20.263413,12.91629 -65.028945,11.74938 -46.402413,-11.9186 3.864005,-4.90984 -31.952291,6.60201 -31.9883626,27.10666 l -0.022164,12.59927" />
+</g>
+<g id="infrastructure-as-code" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M51 86 29 112 51 138 M203 86 225 112 203 138" />
+  <path d="M127 87V114 M87 139V114H167V139" />
+  <rect x="106" y="55" width="42" height="32" rx="4" />
+  <rect x="66" y="139" width="42" height="32" rx="4" />
+  <rect x="146" y="139" width="42" height="32" rx="4" />
+</g>
+</svg>

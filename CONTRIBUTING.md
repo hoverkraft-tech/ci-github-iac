@@ -96,3 +96,14 @@ Actions share the internal safety primitives; action-specific code stays with it
 owner. Startup rollback and explicit destruction use the same verified cleanup.
 The internal modules are not a public API. Keep modules executable with Node.js 24;
 no package installation or build is required.
+
+## Project artwork
+
+The [project logo](.github/logo.svg) and [social preview](.github/social-preview.svg)
+use [Hoverkraft's project template](https://github.com/hoverkraft-tech/branding/blob/c2090278bc389b170ac04dcc7685eabb87eca032/brand/identity/logos/logo-project.svg).
+Preserve its square geometry, wave and colors. The white icon combines connected
+infrastructure nodes with code brackets. The preview uses outlined Inter lettering
+so rendering does not depend on installed fonts. Keep the
+[1280 × 640 PNG export](.github/social-preview.png) aligned with the SVG source.
+The preview embeds the logo geometry to remain self-contained; it is excluded
+from code duplication checks.
