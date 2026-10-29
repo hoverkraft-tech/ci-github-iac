@@ -1,0 +1,10 @@
+---
+namespace: example
+name: smoke
+version: 1.0.0
+readme: README.md
+authors: [Hoverkraft]
+description: Synthetic collection for testing the shared action.
+license: [MIT]
+tags: [tools]
+repository: https://github.com/hoverkraft-tech/ci-github-iac

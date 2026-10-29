@@ -28,8 +28,8 @@ can run several test steps against the same guest.
 
 #### - [Test Ansible](actions/ansible/test/README.md)
 
-Validate playbook syntax and first-party collection sanity using your tooling
-image. Publish check summaries, annotations, PR comments and report artifacts.
+Validate playbook syntax and first-party collection sanity through the official
+Ansible actions. Publish check summaries, annotations, PR comments and report artifacts.
 
 ### Virtual machines
 
@@ -51,8 +51,8 @@ cleanup remains visible and preserves the runtime for a retry.
 
 ## Getting started
 
-For Ansible, check out your repository and build or pull its Ansible tooling image
-on a Linux runner with Docker. Pass the image and playbook or collection paths to
+For Ansible, check out your repository on a Linux runner. Pass its pinned
+Ansible requirements file and playbook or collection paths to
 [ansible/test](actions/ansible/test/README.md).
 
 For VMs, use an ephemeral Linux x86-64 runner with KVM and network access. Check out your
