@@ -1,9 +1,12 @@
-const { AnsibleChecks } = require("./checks.cjs");
+const { AnsibleInputs } = require("./inputs.cjs");
+const { AnsibleReports } = require("./reports.cjs");
 
-module.exports = async ({ core, env = process.env, run }) => {
+module.exports = ({ core, env = process.env }) => {
 	try {
-		const checks = new AnsibleChecks({ core, env, run });
-		await checks.execute();
+		if (env.ANSIBLE_PHASE === "prepare") new AnsibleInputs(core, env).prepare();
+		else if (env.ANSIBLE_PHASE === "collect")
+			new AnsibleReports(core, env).collect();
+		else throw new Error("Unknown Ansible action phase.");
 	} catch (error) {
 		core.setFailed(error.message);
 	}

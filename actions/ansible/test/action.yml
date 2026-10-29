@@ -1,93 +1,88 @@
-# Validate Ansible playbooks and first-party collections in a consumer tooling image.
+# Validate Ansible by composing maintained upstream actions and Hoverkraft reporting.
 #
 # ### Run checks
 #
-# Check out the consumer and build or pull its tooling image before this action.
-# The Linux runner needs Docker. The image must provide `/bin/sh`, `ansible-playbook`,
-# `ansible-test` and `python3`, with the consumer's pinned dependencies installed.
-# No Makefile or reporting script is required. The image's entrypoint is replaced.
+# Check out the consumer on a fresh Linux GitHub-hosted runner. Provide the existing
+# requirements file containing an exact `ansible-core==X.Y.Z` pin and either
+# newline-separated playbook files or one collection directory. Use a workflow
+# matrix for multiple collections. No consumer Make target or tooling image is needed.
 #
-# ```yaml
-# - name: Test Ansible
-#   uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@d2673efa2d13247d9a7ccf9fc2b6876fbf2d3435
-#   with:
-#     container-image: my-project-tooling:local
-#     playbooks: ansible/site.yml
-#     inventory: ansible/inventory.example.yml
-# ```
+# Playbook validation uses [Ansible Lint](https://github.com/ansible/ansible-lint)
+# with its `min` profile: content loading, parsing and native syntax checks. It
+# produces SARIF directly. A uv constraint keeps Ansible Core at the consumer's
+# pinned version. `galaxy-requirements` installs the consumer's role/collection
+# dependencies; `collections-path` adds first-party collections to the search path.
 #
-# Supply newline-separated `playbooks`, `collections`, or both. Paths are explicit
-# checkout-relative paths, without globs. Inventory is optional; when omitted,
-# Ansible uses the image's configuration. Missing, empty and escaping paths fail.
-# Collection roots must follow `ansible_collections/namespace/name` layout.
+# Collection validation uses the maintained Ansible community
+# [ansible-test action](https://github.com/ansible-community/ansible-test-gh-action).
+# It owns Python setup, the test container and native sanity/JUnit generation.
+# Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
+# disabled for sanity checks. Source stays in the consumer's checked-out collection.
+# The upstream actions select their supported Python runtime; these checks do not
+# reuse the consumer's deployment image or apply playbooks. Keep integration and
+# deployment scenarios in the consumer.
 #
-# Each playbook runs with `ansible-playbook --syntax-check`. Each collection runs
-# with `ansible-test sanity --python` using the image's Python version. Checks
-# continue after a nonzero exit so all selected targets receive a result. Each
-# command has a 20-minute timeout. Interrupted containers are forcibly removed.
-# These checks do not apply playbooks or measure code coverage; integration and
-# deployment scenarios remain in the consumer.
-#
-# The checkout is mounted at `/workspace` and commands start there (sanity starts
-# in its collection directory). Containers run with the runner's UID/GID and a
-# temporary home. Use `environment` for Ansible configuration, for example
-# `ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections:/workspace/ansible/collections`.
-# Image environment defaults remain available. Runner secrets are not forwarded.
-#
-# `cache-directory` optionally mounts a checkout-local directory for ansible-test
-# virtual environments. Restore/save it with `actions/cache`, keyed by the tooling
-# runtime. The action does not cache source files or reports. Sanity's normal
-# `tests/output/` files remain in each collection and are not uploaded.
+# Paths must stay inside the checkout and use letters, digits, dots, underscores,
+# hyphens and slashes. Explicit files are required; expand playbook globs in the
+# workflow if needed. Each collection needs `galaxy.yml`. Use a fresh checkout per
+# collection job so native `tests/output/junit` contains only that run's reports.
 #
 # ### Publish results
 #
-# The action writes fresh JUnit status results for every executed check and SARIF
-# locations for syntax failures under `runner.temp`. Raw command output remains
-# in execution logs; report artifacts contain status and file locations only.
-# Hoverkraft's parser publishes summaries and annotations. PR comments use a
-# stable `report-name` and require `pull-requests: write`; forks and Dependabot
-# skip comments. Never use `pull_request_target` to execute untrusted tests.
+# Native SARIF and JUnit files are parsed with Hoverkraft's `parse-ci-reports`,
+# published as summaries and annotations, and attached to a stable PR comment.
+# Native reports preserve upstream diagnostics; use synthetic data suitable for
+# the repository's visibility. The collection action also publishes its own summary.
 #
-# Completed reports are uploaded with unique artifact names and seven-day
-# retention, including after checks or report publication fail. Neither a parser
-# nor an upload can turn failed checks into success. Use a distinct report name
-# for each invocation. Reports describe validation results, not code coverage.
+# Report collection runs after upstream failures, including when the upstream
+# action does not export its report output. Available files are copied to a fresh
+# directory under `runner.temp` and uploaded with a unique artifact name and
+# seven-day retention, including after parsing or commenting errors. Missing
+# reports fail the action. Failed checks remain failures. No custom test runner,
+# Docker lifecycle or JUnit/SARIF generator is maintained here.
+#
+# Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
+# Never run untrusted checks through `pull_request_target`. Use distinct report
+# names for matrix entries. Syntax and sanity results are not code coverage.
 ---
 name: Ansible - Test
-description: Validate playbook syntax and collection sanity, publish reports and annotate pull requests.
+description: Compose official Ansible syntax and sanity actions with Hoverkraft reports, PR comments and artifacts.
 author: Hoverkraft
 branding:
   icon: check-circle
   color: purple
 inputs:
-  container-image:
-    description: Built or pulled tooling image containing Ansible and the consumer's dependencies.
+  ansible-requirements:
+    description: Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     required: true
   playbooks:
-    description: Newline-separated nonempty playbook files relative to the checkout. Supply playbooks or collections.
+    description: Newline-separated playbook files relative to the checkout. Supply playbooks or collection, exclusively.
+    default: ""
+  collection:
+    description: One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.
     default: ""
   inventory:
-    description: Optional inventory file relative to the checkout for syntax validation.
+    description: Optional checkout-relative inventory file for syntax validation.
     default: ""
-  collections:
-    description: Newline-separated first-party collection directories relative to the checkout for sanity validation.
+  ansible-config:
+    description: Optional checkout-relative ansible.cfg file for syntax validation.
     default: ""
-  environment:
-    description: Newline-separated ANSIBLE_* assignments using container paths. ANSIBLE_HOME and ANSIBLE_NOCOLOR are managed by the action.
+  collections-path:
+    description: Optional checkout-relative first-party collection search directory containing ansible_collections.
     default: ""
-  cache-directory:
-    description: Optional checkout-relative directory for ansible-test virtual environments; manage persistence with actions/cache.
+  galaxy-requirements:
+    description: Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.
     default: ""
   report-name:
-    description: Stable summary and PR comment title, distinct for each test step.
+    description: Stable summary and PR comment title, distinct for each test step or matrix entry.
     default: Ansible test results
   github-token:
     description: Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.
     default: ${{ github.token }}
 outputs:
   report-files:
-    description: Newline-separated absolute paths of completed JUnit and SARIF reports, also after check failure.
-    value: ${{ steps.test.outputs.report-files }}
+    description: Newline-separated absolute paths of completed native reports, including after check failure.
+    value: ${{ steps.collect.outputs.report-files }}
   summary:
     description: Parsed validation summary.
     value: ${{ steps.parse.outputs.summary }}
@@ -103,27 +98,68 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Run Ansible checks
-      id: test
+    - name: Prepare Ansible inputs
+      id: inputs
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         ANSIBLE_ACTION_PATH: ${{ github.action_path }}
-        ANSIBLE_TEST_IMAGE: ${{ inputs.container-image }}
-        ANSIBLE_TEST_PLAYBOOKS: ${{ inputs.playbooks }}
-        ANSIBLE_TEST_INVENTORY: ${{ inputs.inventory }}
-        ANSIBLE_TEST_COLLECTIONS: ${{ inputs.collections }}
-        ANSIBLE_TEST_ENVIRONMENT: ${{ inputs.environment }}
-        ANSIBLE_TEST_CACHE: ${{ inputs.cache-directory }}
+        ANSIBLE_PHASE: prepare
+        ANSIBLE_REQUIREMENTS: ${{ inputs.ansible-requirements }}
+        ANSIBLE_PLAYBOOKS: ${{ inputs.playbooks }}
+        ANSIBLE_COLLECTION: ${{ inputs.collection }}
+        ANSIBLE_INVENTORY_FILE: ${{ inputs.inventory }}
+        ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
+        ANSIBLE_COLLECTIONS_DIRECTORY: ${{ inputs.collections-path }}
+        ANSIBLE_GALAXY_REQUIREMENTS: ${{ inputs.galaxy-requirements }}
       with:
-        script: await require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
+        script: require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
+
+    - name: Validate playbook syntax with Ansible Lint
+      if: steps.inputs.outputs.mode == 'syntax'
+      uses: ansible/ansible-lint@9bce2bfb8f4a984e6b13767bc0d6bf0a49492164 # v26.10.1
+      env:
+        UV_CONSTRAINT: ${{ steps.inputs.outputs.constraint }}
+        ANSIBLE_CONFIG: ${{ steps.inputs.outputs.config }}
+        ANSIBLE_INVENTORY: ${{ steps.inputs.outputs.inventory }}
+        ANSIBLE_COLLECTIONS_PATH: ${{ steps.inputs.outputs.collections-path }}
+      with:
+        # Required by upstream when nested in a composite action.
+        override_version: ${{ steps.inputs.outputs.ansible-lint-ref }}
+        args: ${{ steps.inputs.outputs.lint-args }}
+        requirements_file: ${{ steps.inputs.outputs.galaxy }}
+
+    - name: Validate collection sanity with ansible-test
+      id: sanity
+      if: steps.inputs.outputs.mode == 'sanity'
+      uses: ansible-community/ansible-test-gh-action@6ded727edb598e670ac056a8e680ca4050bac0a3 # v1.18.0
+      with:
+        testing-type: sanity
+        ansible-core-version: ${{ steps.inputs.outputs.ansible-core-ref }}
+        collection-src-directory: ${{ github.workspace }}
+        collection-root: ${{ steps.inputs.outputs.collection-root }}
+        test-deps: ${{ steps.inputs.outputs.galaxy != '' && format('-r {0}', steps.inputs.outputs.galaxy) || '' }}
+        coverage: never
+
+    - name: Collect native Ansible reports
+      id: collect
+      if: ${{ always() && steps.inputs.outcome == 'success' }}
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ANSIBLE_ACTION_PATH: ${{ github.action_path }}
+        ANSIBLE_PHASE: collect
+        ANSIBLE_REPORT_DIRECTORY: ${{ steps.inputs.outputs.report-directory }}
+        ANSIBLE_COLLECTION_ROOT: ${{ steps.sanity.outputs.checkout-directory || steps.inputs.outputs.collection }}
+      with:
+        script: require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
 
     - name: Parse Ansible reports
-      if: ${{ always() && steps.test.outputs.report-files != '' }}
+      if: ${{ always() && steps.collect.outputs.report-files != '' }}
       id: parse
       uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
       with:
         report-name: ${{ inputs.report-name }}
-        report-paths: ${{ steps.test.outputs.report-files }}
+        report-paths: ${{ steps.collect.outputs.report-files }}
+        path-mapping: ${{ github.workspace }}:.
         output-format: summary,markdown,annotations
 
     - name: Add Ansible PR comment
@@ -136,11 +172,11 @@ runs:
         token: ${{ inputs.github-token }}
 
     - name: Upload Ansible reports
-      if: ${{ always() && steps.test.outputs.report-files != '' }}
+      if: ${{ always() && steps.collect.outputs.report-files != '' }}
       id: upload
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: ${{ steps.test.outputs.id }}
-        path: ${{ steps.test.outputs.report-files }}
+        name: ${{ steps.inputs.outputs.id }}
+        path: ${{ steps.collect.outputs.report-files }}
         if-no-files-found: error
         retention-days: 7

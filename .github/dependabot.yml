@@ -7,9 +7,7 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directories:
-      - /
-      - /tests/fixture/ansible
+    directory: /
     cooldown:
       default-days: 7
     schedule:
