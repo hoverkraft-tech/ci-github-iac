@@ -1,0 +1,198 @@
+# Execute guest tests, collect reports and publish coverage results.
+#
+# ### Execute guest commands
+#
+# Pass the `vm` output of [vm/create](../create/README.md) from the same job and
+# exactly one of `command` or `test-script`. Commands accept a YAML multiline
+# block; a script must be a nonempty file within the checkout. Both execute in
+# guest Bash with `-euo pipefail`, through standard input, starting in `/tmp`.
+# Checkout files and host environment variables are not copied into the guest.
+# Use self-contained scripts or code prepared by Lima provisioning. Nonzero exit
+# or timeout fails the action; the timeout accepts 1 to 40 minutes, default 10.
+#
+# Testing leaves the guest running for additional test steps. Always schedule
+# [vm/destroy](../destroy/README.md) afterward, including after test or reporting
+# failure. The [action-test workflow](../../../.github/workflows/__test-actions-vm.yml)
+# demonstrates composition and failure assertions.
+#
+# ### Collect test-generated reports
+#
+# Configure test tools to write into the fresh guest directory in `REPORTS_DIR`.
+# Set `report-file` to relative paths or glob patterns, for example:
+#
+# ```yaml
+# report-file: |
+#   junit.xml
+#   coverage/*.info
+# ```
+#
+# Lists accept newlines, commas or semicolons. Basic `*`, `**`, `?` and character
+# class globs are supported. Use filenames containing letters, digits, spaces,
+# dots, underscores or hyphens. Absolute paths and parent traversal are rejected;
+# symbolic links are excluded. Every pattern must match a nonempty regular file.
+# Collection is limited to 100 files, 20 MiB total and two minutes. Guests need
+# Bash, GNU find and an SSH file-copy service, as provided by the Ubuntu fixture.
+#
+# Collection is attempted after command failure or timeout, then the guest report
+# directory is removed. Missing files, incomplete transfers and cleanup errors
+# fail the action. An incomplete collection exports no guest files. Completed
+# files retain their relative names in an isolated host directory; `report-files`
+# lists their absolute paths. See the [success](../../../tests/fixture/assert.sh)
+# and [failure](../../../tests/fixture/fail.sh) fixtures for report examples.
+#
+# Each invocation keeps separate reports under `runner.temp`; later calls preserve
+# earlier results. `report` is a sanitized command-status JUnit file without raw
+# command output or exceptions. Only completed files are exported; failed writes
+# discard partial output and preserve completed guest reports. Collected tool
+# reports retain their original contents. Use synthetic data and exclude secrets,
+# environment dumps and private logs from reports published by public workflows.
+#
+# ### Publish results
+#
+# | `coverage`         | Behavior                                   | Job permission                      |
+# | ------------------ | ------------------------------------------ | ----------------------------------- |
+# | `github` (default) | Summaries, annotations and PR comments     | `pull-requests: write` for comments |
+# | `codecov`          | Upload selected guest reports through OIDC | `id-token: write`                   |
+# | `""`               | Skip parsing, comments and Codecov         | No additional permission            |
+#
+# GitHub mode uses Hoverkraft's `parse-ci-reports` and `create-or-update-comment`
+# actions. It parses collected files, falling back to the command-status report
+# when none are available. `path-mapping` translates guest paths to checkout paths;
+# `summary`, `markdown` and `parsed-files` expose parser results. The parser manages
+# its own dependencies.
+#
+# Choose a distinct, stable `report-name` for each test step and matrix scenario.
+# Reruns update the matching comment. `github-token` defaults to `github.token`.
+# Comments are limited to same-repository pull requests, excluding Dependabot;
+# forks still receive summaries and artifacts. Do not use `pull_request_target`
+# to execute untrusted tests.
+#
+# Codecov mode requires a repository enabled in Codecov and explicit `report-file`
+# selection. Discovery is disabled: only collected guest files are uploaded, never
+# the command-status wrapper. Configure Codecov path fixes when guest source paths
+# differ from repository paths. Upload errors fail the action.
+#
+# Every mode uploads completed reports as a GitHub artifact with a unique name and
+# seven-day retention; `artifact-id` identifies the upload. Upload still runs after
+# parser, comment or Codecov errors. Test and reporting failures remain failures.
+# No extra reporting steps are needed in the workflow.
+---
+name: VM - Test
+description: Run guest test commands, parse reports, comment on pull requests and upload results.
+author: Hoverkraft
+branding:
+  icon: check-circle
+  color: purple
+inputs:
+  vm:
+    description: Private runtime directory returned by vm/create.
+    required: true
+  command:
+    description: |
+      Bash command or multiline commands to execute inside the guest from /tmp.
+      Provide exactly one of command or test-script. Checkout files are not mounted in the guest.
+    default: ""
+  test-script:
+    description: Nonempty Bash script in the checkout to send to the guest instead of command.
+    default: ""
+  test-timeout-minutes:
+    description: Guest command timeout, from 1 to 40 minutes.
+    default: "10"
+  report-file:
+    description: |
+      Optional report paths or glob patterns relative to the guest REPORTS_DIR.
+      Separate patterns with newlines, commas or semicolons. Every pattern must match.
+      Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.
+      Report contents are preserved. Use only reports suitable for public CI.
+    default: ""
+  coverage:
+    description: |
+      Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,
+      or empty to disable reporting. Report artifacts are always retained.
+      Codecov requires report-file selection and id-token write permission for OIDC.
+    default: github
+  report-name:
+    description: Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.
+    default: VM test results
+  path-mapping:
+    description: Optional path mappings forwarded to Hoverkraft's report parser.
+    default: ""
+  github-token:
+    description: Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped.
+    default: ${{ github.token }}
+outputs:
+  report:
+    description: Absolute path of the sanitized command-status JUnit report, including on assertion or collection failure.
+    value: ${{ steps.test.outputs.report }}
+  report-files:
+    description: Newline-separated absolute paths of completed guest report files. Empty when collection is disabled or fails.
+    value: ${{ steps.test.outputs.report-files }}
+  summary:
+    description: Parsed test and coverage summary in GitHub mode.
+    value: ${{ steps.parse-coverage-reports.outputs.summary }}
+  markdown:
+    description: Markdown used for the coverage PR comment in GitHub mode.
+    value: ${{ steps.parse-coverage-reports.outputs.markdown }}
+  parsed-files:
+    description: JSON array of report files parsed in GitHub mode.
+    value: ${{ steps.parse-coverage-reports.outputs.parsed-files }}
+  artifact-id:
+    description: Uploaded report artifact identifier.
+    value: ${{ steps.upload.outputs.artifact-id }}
+runs:
+  using: composite
+  steps:
+    - name: Run tests
+      id: test
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        VM_ACTION_PATH: ${{ github.action_path }}
+        VM_DIRECTORY: ${{ inputs.vm }}
+        TEST_COMMAND: ${{ inputs.command }}
+        TEST_SCRIPT: ${{ inputs.test-script }}
+        TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+        REPORT_FILE: ${{ inputs.report-file }}
+        COVERAGE: ${{ inputs.coverage }}
+      with:
+        script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });
+
+    - name: Parse coverage reports
+      if: ${{ always() && inputs.coverage == 'github' && (steps.test.outputs.report-files != '' || steps.test.outputs.report != '') }}
+      id: parse-coverage-reports
+      uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+      with:
+        report-name: ${{ inputs.report-name }}
+        report-paths: ${{ steps.test.outputs.report-files || steps.test.outputs.report }}
+        path-mapping: ${{ inputs.path-mapping }}
+        output-format: summary,markdown,annotations
+
+    - name: Add coverage PR comment
+      if: >-
+        ${{ always() && inputs.coverage == 'github' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.parse-coverage-reports.outputs.markdown != '' }}
+      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+      with:
+        title: ${{ inputs.report-name }}
+        body: ${{ steps.parse-coverage-reports.outputs.markdown }}
+        token: ${{ inputs.github-token }}
+
+    - name: Upload coverage to Codecov
+      if: ${{ always() && inputs.coverage == 'codecov' && steps.test.outputs.codecov-files != '' }}
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+      with:
+        files: ${{ steps.test.outputs.codecov-files }}
+        disable_search: true
+        use_oidc: true
+        disable_telem: true
+        fail_ci_if_error: true
+
+    - name: Upload test and coverage reports
+      if: ${{ always() && (steps.test.outputs.report-files != '' || steps.test.outputs.report != '') }}
+      id: upload
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ steps.test.outputs.id }}
+        path: |
+          ${{ steps.test.outputs.report }}
+          ${{ steps.test.outputs.report-files }}
+        if-no-files-found: error
+        retention-days: 7

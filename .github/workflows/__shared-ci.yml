@@ -1,0 +1,51 @@
+---
+name: Internal - Common Continuous Integration tasks
+
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run unit tests
+        run: make test
+  linter:
+    uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+    with:
+      linter-env: |
+        FILTER_REGEX_EXCLUDE=/(\.cache|\.reports)/
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      packages: read
+      pull-requests: write
+      security-events: write
+      statuses: write
+  vm:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: $/.github/workflows/__test-actions-vm.yml
+  checks:
+    if: ${{ always() }}
+    needs: [tests, linter, vm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all checks
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const results = Object.values(JSON.parse(process.env.RESULTS));
+            if (!results.every(job => job.result === 'success')) core.setFailed('A required check did not succeed');

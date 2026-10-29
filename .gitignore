@@ -1,0 +1,7 @@
+.cache/
+.reports/
+node_modules/
+.env
+*.tfstate*
+*.tfplan
+.terraform/

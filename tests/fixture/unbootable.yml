@@ -1,0 +1,7 @@
+---
+# A missing local image forces startup failure after runtime allocation.
+vmType: qemu
+arch: x86_64
+images:
+  - location: /nonexistent-iac-fixture.img
+    arch: x86_64
