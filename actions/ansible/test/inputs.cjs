@@ -31,14 +31,7 @@ class AnsibleInputs {
 	}
 
 	prepare() {
-		const playbooks = [
-			...new Set(
-				(this.env.ANSIBLE_PLAYBOOKS || "")
-					.split(/\r?\n/)
-					.map((value) => value.trim())
-					.filter(Boolean),
-			),
-		];
+		const playbook = this.env.ANSIBLE_TEST_PLAYBOOK?.trim();
 		const collection = this.env.ANSIBLE_COLLECTION?.trim();
 		const targetPython = this.env.ANSIBLE_TARGET_PYTHON_VERSION?.trim() || "";
 		if (targetPython && (!collection || !/^3\.[0-9]+$/.test(targetPython))) {
@@ -47,9 +40,9 @@ class AnsibleInputs {
 			);
 		}
 		this.core.setOutput("target-python-version", targetPython);
-		if (Boolean(playbooks.length) === Boolean(collection)) {
+		if (Boolean(playbook) === Boolean(collection)) {
 			throw new Error(
-				"Provide playbooks or one collection, exclusively. Use a matrix for multiple collections.",
+				"Provide test-playbook or one collection, exclusively. Use a matrix for multiple collections.",
 			);
 		}
 		const requirements = this.checkoutPath(this.env.ANSIBLE_REQUIREMENTS);
@@ -62,7 +55,10 @@ class AnsibleInputs {
 			throw new Error(
 				"ansible-requirements must contain one exact stable ansible-core==X.Y.Z pin.",
 			);
-		const files = playbooks.map((value) => this.checkoutPath(value));
+		this.core.setOutput(
+			"test-playbook",
+			playbook ? this.checkoutPath(playbook) : "",
+		);
 		const collectionRoot = collection
 			? this.checkoutPath(collection, true)
 			: "";
@@ -92,32 +88,19 @@ class AnsibleInputs {
 		const reports = fs.mkdtempSync(
 			path.join(this.env.RUNNER_TEMP, "ansible-reports-"),
 		);
+		if (playbook) this.core.addPath(path.join(reports, "venv/bin"));
 		const constraint = path.join(reports, "constraints.txt");
 		fs.writeFileSync(constraint, `ansible-core==${pins[0][1]}\n`);
 		this.core.setOutput("constraint", constraint);
 		this.core.setOutput("ansible-core-ref", `v${pins[0][1]}`);
-		this.core.setOutput("mode", collection ? "sanity" : "syntax");
+		this.core.setOutput("mode", collection ? "sanity" : "playbook");
 		this.core.setOutput("collection", collectionRoot);
 		this.core.setOutput(
 			"collection-root",
 			collectionRoot ? path.relative(this.workspace, collectionRoot) : "",
 		);
-		const lintRef = fs
-			.readFileSync(path.join(__dirname, "action.yml"), "utf8")
-			.match(/uses: ansible\/ansible-lint@([a-f0-9]{40})\b/)?.[1];
-		if (!lintRef)
-			throw new Error("The Ansible Lint action must have an immutable pin.");
-		this.core.setOutput("ansible-lint-ref", lintRef);
 		this.core.setOutput("report-directory", reports);
 		this.core.setOutput("id", path.basename(reports));
-		this.core.setOutput(
-			"lint-args",
-			[
-				"--profile min",
-				`--sarif-file '${path.join(reports, "syntax.sarif")}'`,
-				...files.map((file) => `'${file}'`),
-			].join(" "),
-		);
 	}
 }
 

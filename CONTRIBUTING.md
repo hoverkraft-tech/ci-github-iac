@@ -58,14 +58,14 @@ comments. Consumer workflows grant comment permissions and always schedule clean
 Unit tests exercise the action entrypoints and internal modules directly.
 Keep hosted boot checks alongside the mocked unit contracts.
 
-`__test-actions-ansible.yml` exercises syntax and collection sanity success/failure
-scenarios through the official Ansible Lint and Ansible community testing actions.
+`__test-actions-ansible.yml` exercises playbook tests and collection sanity success/failure
+scenarios through maintained playbook execution and Ansible community testing actions.
 It verifies native report publication after failures. Adjacent JavaScript only
 validates inputs and collects reports; upstream actions own test execution,
-Python setup and containers. Consumers supply their existing Ansible Core pin,
+collection Python setup and containers. Playbook tests use a temporary virtual
+environment and the built-in JUnit callback. Consumers supply their Ansible Core pin,
 Galaxy requirements and selected targets. Dependabot maintains upstream action
-pins and the fixture's requirements file. The lint installation ref is derived
-from its `uses` pin so nested action setup stays on the same revision.
+pins and the fixture's requirements file. Linting remains in the separate linter workflow.
 
 ## Releases and dependencies
 

@@ -43,9 +43,12 @@ class AnsibleReports {
 				}
 			}
 		} else {
-			const sarif = path.join(destination, "syntax.sarif");
-			if (fs.existsSync(sarif) && fs.lstatSync(sarif).isFile())
-				files.push(sarif);
+			for (const entry of fs.readdirSync(destination, {
+				withFileTypes: true,
+			})) {
+				if (entry.isFile() && entry.name.endsWith(".xml"))
+					files.push(path.join(destination, entry.name));
+			}
 		}
 		if (!files.length)
 			throw new Error(

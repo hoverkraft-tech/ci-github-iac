@@ -26,9 +26,10 @@ function fixture(t) {
 		RUNNER_TEMP: temp,
 		ANSIBLE_PHASE: "prepare",
 		ANSIBLE_REQUIREMENTS: "requirements.txt",
-		ANSIBLE_PLAYBOOKS: "playbook.yml",
+		ANSIBLE_TEST_PLAYBOOK: "playbook.yml",
 	};
 	const core = {
+		addPath: () => {},
 		setOutput: (key, value) => {
 			outputs[key] = value;
 		},
@@ -37,19 +38,18 @@ function fixture(t) {
 	return { root, workspace, temp, outputs, failures, env, core };
 }
 
-test("syntax inputs keep the consumer's exact Ansible pin and native SARIF location", (t) => {
+test("playbook tests keep the consumer's exact Ansible pin and explicit test target", (t) => {
 	const f = fixture(t);
 	entrypoint(f);
 	assert.deepEqual(f.failures, []);
-	assert.equal(f.outputs.mode, "syntax");
+	assert.equal(f.outputs.mode, "playbook");
 	assert.equal(f.outputs["target-python-version"], "");
 	assert.equal(f.outputs["ansible-core-ref"], "v2.99.1");
 	assert.equal(
 		fs.readFileSync(f.outputs.constraint, "utf8"),
 		"ansible-core==2.99.1\n",
 	);
-	assert.ok(f.outputs["lint-args"].includes("--profile min --sarif-file"));
-	assert.ok(f.outputs["lint-args"].endsWith(`'${f.workspace}/playbook.yml'`));
+	assert.equal(f.outputs["test-playbook"], `${f.workspace}/playbook.yml`);
 	assert.equal(path.dirname(f.outputs["report-directory"]), f.temp);
 });
 
@@ -65,7 +65,7 @@ test("collection inputs select a single checked-out source with Galaxy metadata"
 		...f,
 		env: {
 			...f.env,
-			ANSIBLE_PLAYBOOKS: "",
+			ANSIBLE_TEST_PLAYBOOK: "",
 			ANSIBLE_COLLECTION: collection,
 			ANSIBLE_TARGET_PYTHON_VERSION: "3.99",
 		},
@@ -84,15 +84,15 @@ test("ambiguous selections, missing targets, non-pinned versions and escaping pa
 		"ansible-core>=2.99\n",
 	);
 	for (const inputs of [
-		{ ANSIBLE_PLAYBOOKS: "" },
+		{ ANSIBLE_TEST_PLAYBOOK: "" },
 		{ ANSIBLE_COLLECTION: "." },
-		{ ANSIBLE_PLAYBOOKS: "missing.yml" },
-		{ ANSIBLE_PLAYBOOKS: "outside" },
-		{ ANSIBLE_PLAYBOOKS: "../temp" },
+		{ ANSIBLE_TEST_PLAYBOOK: "missing.yml" },
+		{ ANSIBLE_TEST_PLAYBOOK: "outside" },
+		{ ANSIBLE_TEST_PLAYBOOK: "../temp" },
 		{ ANSIBLE_REQUIREMENTS: "floating.txt" },
 		{ ANSIBLE_TARGET_PYTHON_VERSION: "3.99" },
 		{
-			ANSIBLE_PLAYBOOKS: "",
+			ANSIBLE_TEST_PLAYBOOK: "",
 			ANSIBLE_COLLECTION: ".",
 			ANSIBLE_TARGET_PYTHON_VERSION: "3.99; false",
 		},
@@ -144,4 +144,24 @@ test("missing reports and redirected report directories cannot be reported as su
 	entrypoint({ ...f, env: { ...env, ANSIBLE_COLLECTION_ROOT: "collection" } });
 	assert.match(f.failures.pop(), /symbolic links/);
 	assert.equal(f.outputs["report-files"], undefined);
+});
+
+test("test playbooks publish native JUnit without exposing the installed runtime", (t) => {
+	const f = fixture(t);
+	entrypoint(f);
+	const reports = f.outputs["report-directory"];
+	fs.mkdirSync(path.join(reports, "venv"));
+	const junit =
+		'<testsuite tests="1"><testcase name="assert fixture"/></testsuite>';
+	fs.writeFileSync(path.join(reports, "playbook.xml"), junit);
+	entrypoint({
+		...f,
+		env: {
+			...f.env,
+			ANSIBLE_PHASE: "collect",
+			ANSIBLE_REPORT_DIRECTORY: reports,
+		},
+	});
+	assert.deepEqual(f.failures, []);
+	assert.equal(f.outputs["report-files"], path.join(reports, "playbook.xml"));
 });

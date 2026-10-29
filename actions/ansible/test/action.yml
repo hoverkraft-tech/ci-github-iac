@@ -1,56 +1,53 @@
-# Validate Ansible by composing maintained upstream actions and Hoverkraft reporting.
+# Run Ansible tests with maintained upstream actions and native JUnit reports.
 #
-# ### Run checks
+# ### Run tests
 #
-# Check out the consumer on a fresh Linux GitHub-hosted runner. Provide the existing
-# requirements file containing an exact `ansible-core==X.Y.Z` pin and either
-# newline-separated playbook files or one collection directory. Use a workflow
-# matrix for multiple collections. No consumer Make target or tooling image is needed.
+# Check out the consumer on a fresh Linux GitHub-hosted runner. Supply its existing
+# requirements file containing an exact `ansible-core==X.Y.Z` pin and either an
+# explicit `test-playbook` or one `collection`. Use a matrix for multiple targets.
+# Linting and playbook syntax checks belong in separate consumer jobs.
 #
-# Playbook validation uses [Ansible Lint](https://github.com/ansible/ansible-lint)
-# with its `min` profile: content loading, parsing and native syntax checks. It
-# produces SARIF directly. A uv constraint keeps Ansible Core at the consumer's
-# pinned version. `galaxy-requirements` installs the consumer's role/collection
-# dependencies; `collections-path` adds first-party collections to the search path.
+# Test playbooks are executed by
+# [dawidd6/action-ansible-playbook](https://github.com/dawidd6/action-ansible-playbook).
+# The pinned Ansible Core is installed in a temporary virtual environment using
+# the runner's Python; that Python must be supported by the selected Ansible Core.
+# Ansible's built-in JUnit callback writes task results, including failed assertions.
+# Provide test assertions and disposable targets, never a deployment playbook.
+# `inventory`, `ansible-config`, `collections-path` and `galaxy-requirements`
+# configure test execution. The action does not provision test environments.
 #
-# Collection validation uses the maintained Ansible community
-# [ansible-test action](https://github.com/ansible-community/ansible-test-gh-action).
-# It owns Python setup, the test container and native sanity/JUnit generation.
-# The selected upstream revision pins its nested actions to full commit SHAs,
-# matching consumers that enforce transitive action pinning.
-# Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
-# disabled for sanity checks. Source stays in the consumer's checked-out collection.
-# Sanity checks cover all supported Python versions by default. Set
-# `target-python-version` when the consumer supports a specific Python runtime.
-# The upstream actions select their execution runtime; these checks do not
-# reuse the consumer's deployment image or apply playbooks. Keep integration and
-# deployment scenarios in the consumer.
+# Collection sanity uses the maintained Ansible community
+# [ansible-test action](https://github.com/ansible-community/ansible-test-gh-action),
+# which owns Python setup, test containers and native JUnit generation.
+# Its Ansible Core Git tag comes from the same requirements pin. Coverage is
+# disabled for sanity checks. The selected upstream revision pins nested actions
+# to full commit SHAs. Source stays in the consumer's checked-out collection.
+# Sanity covers all supported Python versions unless `target-python-version`
+# selects the consumer's supported runtime. These are sanity results, not code coverage.
 #
 # Paths must stay inside the checkout and use letters, digits, dots, underscores,
-# hyphens and slashes. Explicit files are required; expand playbook globs in the
-# workflow if needed. Each collection needs `galaxy.yml`. Use a fresh checkout per
+# hyphens and slashes. Each collection needs `galaxy.yml`. Use a fresh checkout per
 # collection job so native `tests/output/junit` contains only that run's reports.
 #
 # ### Publish results
 #
-# Native SARIF and JUnit files are parsed with Hoverkraft's `parse-ci-reports`,
-# published as summaries and annotations, and attached to a stable PR comment.
-# Native reports preserve upstream diagnostics; use synthetic data suitable for
-# the repository's visibility. The collection action also publishes its own summary.
+# Hoverkraft's `parse-ci-reports` publishes native JUnit as summaries, annotations
+# and a stable PR comment. Test output and task results appear in these reports;
+# use synthetic data suitable for the repository's visibility. The collection
+# action also publishes its own summary.
 #
 # Report collection runs after upstream failures, including when the upstream
-# action does not export its report output. Available files are copied to a fresh
-# directory under `runner.temp` and uploaded with a unique artifact name and
-# seven-day retention, including after parsing or commenting errors. Missing
-# reports fail the action. Failed checks remain failures. No custom test runner,
-# Docker lifecycle or JUnit/SARIF generator is maintained here.
+# action does not export its report output. Reports are uploaded with a unique
+# artifact name and seven-day retention, including after parsing or commenting
+# errors. Missing reports fail the action. Failed tests remain failures. No custom
+# test runner, Docker lifecycle or JUnit generator is maintained here.
 #
 # Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
-# Never run untrusted checks through `pull_request_target`. Use distinct report
-# names for matrix entries. Syntax and sanity results are not code coverage.
+# Never run untrusted tests through `pull_request_target`. Use distinct report names
+# for matrix entries.
 ---
 name: Ansible - Test
-description: Compose official Ansible syntax and sanity actions with Hoverkraft reports, PR comments and artifacts.
+description: Run Ansible test playbooks and collection sanity with native reports, PR comments and artifacts.
 author: Hoverkraft
 branding:
   icon: check-circle
@@ -59,8 +56,8 @@ inputs:
   ansible-requirements:
     description: Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     required: true
-  playbooks:
-    description: Newline-separated playbook files relative to the checkout. Supply playbooks or collection, exclusively.
+  test-playbook:
+    description: Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively.
     default: ""
   collection:
     description: One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.
@@ -69,10 +66,10 @@ inputs:
     description: Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.
     default: ""
   inventory:
-    description: Optional checkout-relative inventory file for syntax validation.
+    description: Optional checkout-relative inventory file for test playbook execution.
     default: ""
   ansible-config:
-    description: Optional checkout-relative ansible.cfg file for syntax validation.
+    description: Optional checkout-relative ansible.cfg file for test playbook execution.
     default: ""
   collections-path:
     description: Optional checkout-relative first-party collection search directory containing ansible_collections.
@@ -112,7 +109,7 @@ runs:
         ANSIBLE_ACTION_PATH: ${{ github.action_path }}
         ANSIBLE_PHASE: prepare
         ANSIBLE_REQUIREMENTS: ${{ inputs.ansible-requirements }}
-        ANSIBLE_PLAYBOOKS: ${{ inputs.playbooks }}
+        ANSIBLE_TEST_PLAYBOOK: ${{ inputs.test-playbook }}
         ANSIBLE_COLLECTION: ${{ inputs.collection }}
         ANSIBLE_TARGET_PYTHON_VERSION: ${{ inputs.target-python-version }}
         ANSIBLE_INVENTORY_FILE: ${{ inputs.inventory }}
@@ -122,19 +119,30 @@ runs:
       with:
         script: require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
 
-    - name: Validate playbook syntax with Ansible Lint
-      if: steps.inputs.outputs.mode == 'syntax'
-      uses: ansible/ansible-lint@9bce2bfb8f4a984e6b13767bc0d6bf0a49492164 # v26.10.1
+    - name: Install the pinned Ansible test runtime
+      if: steps.inputs.outputs.mode == 'playbook'
+      shell: bash
       env:
-        UV_CONSTRAINT: ${{ steps.inputs.outputs.constraint }}
+        REPORT_DIRECTORY: ${{ steps.inputs.outputs.report-directory }}
+        REQUIREMENTS: ${{ steps.inputs.outputs.constraint }}
+      run: |
+        python3 -m venv "$REPORT_DIRECTORY/venv"
+        "$REPORT_DIRECTORY/venv/bin/pip" install --disable-pip-version-check -r "$REQUIREMENTS"
+
+    - name: Execute Ansible test playbook
+      if: steps.inputs.outputs.mode == 'playbook'
+      uses: dawidd6/action-ansible-playbook@126642a1c6ce512da255ef2b41e8ee90f0077474 # v9
+      env:
         ANSIBLE_CONFIG: ${{ steps.inputs.outputs.config }}
         ANSIBLE_INVENTORY: ${{ steps.inputs.outputs.inventory }}
         ANSIBLE_COLLECTIONS_PATH: ${{ steps.inputs.outputs.collections-path }}
+        ANSIBLE_CALLBACKS_ENABLED: ansible.builtin.junit
+        JUNIT_OUTPUT_DIR: ${{ steps.inputs.outputs.report-directory }}
+        JUNIT_TASK_RELATIVE_PATH: ${{ github.workspace }}
+        JUNIT_HIDE_TASK_ARGUMENTS: "true"
       with:
-        # Required by upstream when nested in a composite action.
-        override_version: ${{ steps.inputs.outputs.ansible-lint-ref }}
-        args: ${{ steps.inputs.outputs.lint-args }}
-        requirements_file: ${{ steps.inputs.outputs.galaxy }}
+        playbook: ${{ steps.inputs.outputs.test-playbook }}
+        requirements: ${{ steps.inputs.outputs.galaxy }}
 
     - name: Validate collection sanity with ansible-test
       id: sanity
