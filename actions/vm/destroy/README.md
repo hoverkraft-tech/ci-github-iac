@@ -17,7 +17,39 @@
 Delete an owned Lima VM, verify deletion and remove its runtime directory.
 
 Destroy the guest and verify absence before removing its private runtime and keys.
-See [the usage guide](../../../docs/usage/vm-e2e.md) for cleanup and recovery.
+
+### Schedule cleanup
+
+Pass the original `vm` output from [vm/create](../create/README.md) on the same
+runner. Run this step after all [vm/test](../test/README.md) calls and reporting:
+
+```yaml
+- name: Destroy VM
+  if: ${{ always() && steps.vm.outputs.vm != '' }}
+  uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@<reviewed-full-commit-sha>
+  with:
+    vm: ${{ steps.vm.outputs.vm }}
+```
+
+Keep `always()` so cleanup runs after startup, test or reporting failure.
+Use the same reviewed revision as the other VM actions. No report file or
+additional GitHub permission is needed. Do not suppress cleanup failures.
+
+### Verification and recovery
+
+Destruction accepts only an owned private runtime created by `vm/create`. It
+verifies guest absence before deleting the runtime and SSH keys. `removed` is
+true only after verified cleanup. Lima deletion and verification commands have
+two-minute deadlines and a 1 MiB output limit per stream.
+
+Failed cleanup fails the step and retains the runtime for recovery. Retry with
+another `vm/destroy` step using `if: always()` and the original `vm` output on
+the same runner. Repeated destruction succeeds after removal. Never upload the
+private runtime directory.
+
+These actions support ephemeral runners. Forced runner termination can interrupt
+cleanup; runner disposal bounds remaining local resources. Persistent runners
+and cloud resource cleanup are outside scope.
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -25,7 +57,7 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for cleanup and recovery.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@024d9b2a43a6c6963323d5c0a99b8656939011cd # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@081afc2fec975206110e367af328afdb7b681dce # feat/phase-1-bootstrap
   with:
     # Private runtime directory returned by vm/create; repeated deletion is safe.
     # This input is required.

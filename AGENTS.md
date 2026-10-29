@@ -2,7 +2,7 @@
 
 Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/.github/blob/main/AGENTS.md).
 
-- Follow the [Make and workflow conventions](docs/development/contributing.md#make-and-workflow-conventions)
+- Follow the [Make and workflow conventions](CONTRIBUTING.md#make-and-workflow-conventions)
   from ci-github-container and workstation-manager when changing tooling.
 - Keep environment scenarios in consumers. This repository owns reusable validation
   and focused disposable VM operations. Workflows own VM lifetime; vm/test composes
@@ -22,5 +22,6 @@ Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/
 - Run `make test` and `make lint` for changes. Validate VM behavior through the
   hosted action-test workflow on a Linux x86-64 runner with KVM.
 - Generate action reference docs with `make docs`; never edit generated output.
-- Keep user guidance in docs/usage and contributor guidance in docs/development.
-  Record important decisions in ADRs. Use Conventional Commits and review before merging.
+- Keep action usage guidance in action metadata and generated readmes, and contributor
+  guidance in CONTRIBUTING.md. Record architecture decisions in docs/development/adr.
+  Use Conventional Commits and review before merging.

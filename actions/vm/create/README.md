@@ -17,7 +17,62 @@
 Create an isolated Lima VM, rolling back resources if startup fails.
 
 Create a disposable Lima guest and return its private runtime directory.
-See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
+
+### Runner and configuration
+
+Use an ephemeral Linux x86-64 runner with KVM, network access and `contents: read`.
+Check out the consumer repository with `persist-credentials: false`. Reserve a
+90-minute job timeout for installation, startup, testing and cleanup. Pin all
+three VM actions to the same reviewed full commit SHA.
+
+`vm-config` must point to an existing Lima YAML file within the checkout. Missing
+or blank input fails before allocating a runtime. The consumer owns the image
+and resource settings; no default configuration is supplied. The
+[test fixture](../../../tests/fixture/lima.yml) provides a digest-pinned Ubuntu
+example. Plain mode is enforced: host mounts, SSH agent forwarding and dynamic
+port forwarding are disabled. Provisioning still runs, so treat configuration
+and scripts as trusted repository code.
+
+### Compose the VM actions
+
+After checkout, create the guest, [run tests](../test/README.md) and
+[destroy the guest](../destroy/README.md) in the same job:
+
+```yaml
+- name: Create VM
+  id: vm
+  uses: hoverkraft-tech/ci-github-iac/actions/vm/create@<reviewed-full-commit-sha>
+  with:
+    vm-config: tests/lima.yml
+- name: Test VM
+  uses: hoverkraft-tech/ci-github-iac/actions/vm/test@<same-reviewed-full-commit-sha>
+  with:
+    vm: ${{ steps.vm.outputs.vm }}
+    command: test -d /run/systemd/system
+    report-name: Infrastructure VM tests
+- name: Destroy VM
+  if: ${{ always() && steps.vm.outputs.vm != '' }}
+  uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@<same-reviewed-full-commit-sha>
+  with:
+    vm: ${{ steps.vm.outputs.vm }}
+```
+
+Default GitHub reporting needs `pull-requests: write` for PR comments. Other
+reporting modes and permissions are documented by `vm/test`. The maintained
+[action-test workflow](../../../.github/workflows/__test-actions-vm.yml) also
+covers failures and repeated tests. No consumer Makefile is required.
+
+### Startup and cleanup
+
+The action installs Lima and QEMU and allocates a private
+`/tmp/iac-<uid>-<random>` runtime. It exports `vm` before starting the guest so
+cleanup can retry after startup failure. Startup has an 11-minute subprocess
+deadline and rolls back partial creation. The runtime is retained if rollback
+cannot verify removal; keep the `always()` destruction step and let failures
+fail the job. Never upload the runtime directory, which contains SSH keys and
+VM state. Forced runner termination can interrupt cleanup; ephemeral runner
+disposal bounds remaining resources. Persistent runners and cloud resources
+are outside this action's scope.
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -25,7 +80,7 @@ See [the usage guide](../../../docs/usage/vm-e2e.md) for workflow composition.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@024d9b2a43a6c6963323d5c0a99b8656939011cd # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@081afc2fec975206110e367af328afdb7b681dce # feat/phase-1-bootstrap
   with:
     # Path to a Lima YAML file in the checkout. Plain mode is enforced.
     # This input is required.
