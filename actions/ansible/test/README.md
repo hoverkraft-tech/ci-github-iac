@@ -25,6 +25,15 @@ The Linux runner needs Docker. The image must provide `/bin/sh`, `ansible-playbo
 `ansible-test` and `python3`, with the consumer's pinned dependencies installed.
 No Makefile or reporting script is required. The image's entrypoint is replaced.
 
+```yaml
+- name: Test Ansible
+  uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@7bb6c22d7e9a9eded70627a001ea880a033e100d
+  with:
+    container-image: my-project-tooling:local
+    playbooks: ansible/site.yml
+    inventory: ansible/inventory.example.yml
+```
+
 Supply newline-separated `playbooks`, `collections`, or both. Paths are explicit
 checkout-relative paths, without globs. Inventory is optional; when omitted,
 Ansible uses the image's configuration. Missing, empty and escaping paths fail.
@@ -63,42 +72,6 @@ nor an upload can turn failed checks into success. Use a distinct report name
 for each invocation. Reports describe validation results, not code coverage.
 
 <!-- overview:end -->
-<!-- usage:start -->
-
-## Usage
-
-```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@70843368d5f5f7b0a2cec1e8435d81cc40beee64 # 0.1.0
-  with:
-    # Built or pulled tooling image containing Ansible and the consumer's dependencies.
-    # This input is required.
-    container-image: ""
-
-    # Newline-separated nonempty playbook files relative to the checkout. Supply playbooks or collections.
-    playbooks: ""
-
-    # Optional inventory file relative to the checkout for syntax validation.
-    inventory: ""
-
-    # Newline-separated first-party collection directories relative to the checkout for sanity validation.
-    collections: ""
-
-    # Newline-separated ANSIBLE_* assignments using container paths. ANSIBLE_HOME and ANSIBLE_NOCOLOR are managed by the action.
-    environment: ""
-
-    # Optional checkout-relative directory for ansible-test virtual environments; manage persistence with actions/cache.
-    cache-directory: ""
-
-    # Stable summary and PR comment title, distinct for each test step.
-    # Default: `Ansible test results`
-    report-name: Ansible test results
-
-    # Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.
-    # Default: `${{ github.token }}`
-    github-token: ${{ github.token }}
-```
-
-<!-- usage:end -->
 <!-- inputs:start -->
 
 ## Inputs

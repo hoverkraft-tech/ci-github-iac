@@ -47,19 +47,17 @@ class CheckReports {
 	escape(value) {
 		// biome-ignore lint/suspicious/noControlCharactersInRegex: XML 1.0 forbids these control characters in filenames.
 		const forbiddenControls = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g;
-		return value
-			.replace(forbiddenControls, "")
-			.replace(
-				/[&<>"']/g,
-				(character) =>
-					({
-						"&": "&amp;",
-						"<": "&lt;",
-						">": "&gt;",
-						'"': "&quot;",
-						"'": "&apos;",
-					})[character],
-			);
+		return value.replace(forbiddenControls, "").replace(
+			/[&<>"']/g,
+			(character) =>
+				({
+					"&": "&amp;",
+					"<": "&lt;",
+					">": "&gt;",
+					'"': "&quot;",
+					"'": "&apos;",
+				})[character],
+		);
 	}
 
 	write() {
