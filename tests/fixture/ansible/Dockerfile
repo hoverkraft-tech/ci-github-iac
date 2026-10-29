@@ -6,4 +6,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
 COPY requirements.txt /opt/requirements.txt
 RUN python3 -m venv /opt/ansible && /opt/ansible/bin/pip install --no-cache-dir -r /opt/requirements.txt
 ENV PATH="/opt/ansible/bin:${PATH}"
+USER 1000:1000
 HEALTHCHECK CMD ["ansible-playbook", "--version"]
