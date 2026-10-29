@@ -34,6 +34,8 @@ dependencies; `collections-path` adds first-party collections to the search path
 Collection validation uses the maintained Ansible community
 [ansible-test action](https://github.com/ansible-community/ansible-test-gh-action).
 It owns Python setup, the test container and native sanity/JUnit generation.
+The selected upstream revision pins its nested actions to full commit SHAs,
+matching consumers that enforce transitive action pinning.
 Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
 disabled for sanity checks. Source stays in the consumer's checked-out collection.
 The upstream actions select their supported Python runtime; these checks do not
