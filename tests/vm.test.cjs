@@ -138,6 +138,32 @@ test("creation action rejects empty configuration before allocating a runtime", 
 	assert.equal(allocate.mock.callCount(), 0);
 });
 
+test("custom startup budgets retain a bounded subprocess deadline", (t) => {
+	const { vm } = fixture(t);
+	const command = t.mock.method(vm, "command", () => "");
+	new GuestCreation("guest.yml", "20").start(vm);
+	assert.ok(command.mock.calls[0].arguments[0].includes("--timeout=20m"));
+	assert.equal(command.mock.calls[0].arguments[1].timeout, 21 * 60000);
+});
+
+test("invalid startup budgets fail before allocating a runtime", (t) => {
+	fixture(t);
+	const allocate = t.mock.method(VirtualMachine, "allocate");
+	for (const timeout of ["", "0", "-1", "41", "1.5", "unbounded"]) {
+		assert.throws(
+			() => new GuestCreation("guest.yml", timeout),
+			/Startup timeout/,
+		);
+	}
+	const { outputs, failures } = runAction(t, "create", {
+		VM_CONFIG: "guest.yml",
+		VM_STARTUP_TIMEOUT_MINUTES: "41",
+	});
+	assert.deepEqual(outputs, {});
+	assert.equal(failures.length, 1);
+	assert.equal(allocate.mock.callCount(), 0);
+});
+
 test("repeated creation refuses to reuse or delete a running VM", (t) => {
 	const { vm } = fixture(t);
 	t.mock.method(vm, "exists", () => true);
@@ -384,6 +410,7 @@ test("creation action exports recovery outputs before failed startup", (t) => {
 	});
 	assert.equal(outputs.vm, vm.home);
 	assert.equal(outputs.id, path.basename(vm.home));
+	assert.equal(outputs.name, vm.name);
 	assert.equal(failures.length, 1);
 	assert.equal(failures[0].includes("secret"), false);
 	assert.equal(fs.existsSync(vm.home), false);

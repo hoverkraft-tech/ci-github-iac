@@ -51,6 +51,21 @@ jobs:
         uses: $/actions/vm/create
         with:
           vm-config: ${{ matrix.config }}
+          startup-timeout-minutes: 5
+      - name: Verify host tools can use the exported instance
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          LIMA_HOME: ${{ steps.vm.outputs.vm }}
+          VM_NAME: ${{ steps.vm.outputs.name }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { execFileSync } = require('node:child_process');
+            const system = execFileSync('limactl', ['shell', '--workdir', '/tmp', process.env.VM_NAME, 'uname', '-s'], {
+              encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024,
+            });
+            assert.equal(system.trim(), 'Linux');
       - name: Execute guest assertions
         if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
         id: test

@@ -1,10 +1,16 @@
 const { Workspace } = require("../_internal/workspace.cjs");
 
 class GuestCreation {
-	constructor(config) {
+	constructor(config, startupTimeout = 10) {
 		if (typeof config !== "string" || !config.trim())
 			throw new Error("vm-config is required");
 		this.template = new Workspace().file(config);
+		const minutes = String(startupTimeout).trim();
+		if (!/^[1-9]\d?$/.test(minutes) || Number(minutes) > 40)
+			throw new Error(
+				"Startup timeout must be an integer from 1 to 40 minutes",
+			);
+		this.startupTimeout = Number(minutes);
 	}
 
 	start(vm) {
@@ -15,11 +21,11 @@ class GuestCreation {
 					"start",
 					"--tty=false",
 					"--plain",
-					"--timeout=10m",
+					`--timeout=${this.startupTimeout}m`,
 					`--name=${vm.name}`,
 					this.template,
 				],
-				{ timeout: 660000 },
+				{ timeout: (this.startupTimeout + 1) * 60000 },
 			);
 		} catch (error) {
 			vm.destroy();

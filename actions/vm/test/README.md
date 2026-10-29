@@ -101,7 +101,7 @@ No extra reporting steps are needed in the workflow.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@081afc2fec975206110e367af328afdb7b681dce # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@2b6495c4fd7dad081899d21186e4f554f3ca8d9c # feat/phase-1-bootstrap
   with:
     # Private runtime directory returned by vm/create.
     # This input is required.

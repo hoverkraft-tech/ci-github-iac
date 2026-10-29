@@ -48,13 +48,20 @@
 #
 # The action installs Lima and QEMU and allocates a private
 # `/tmp/iac-<uid>-<random>` runtime. It exports `vm` before starting the guest so
-# cleanup can retry after startup failure. Startup has an 11-minute subprocess
-# deadline and rolls back partial creation. The runtime is retained if rollback
+# cleanup can retry after startup failure. Startup defaults to ten minutes, with
+# one additional minute for the subprocess deadline; `startup-timeout-minutes`
+# allows longer provisioning. Failed startup rolls back partial creation.
+# The runtime is retained if rollback
 # cannot verify removal; keep the `always()` destruction step and let failures
 # fail the job. Never upload the runtime directory, which contains SSH keys and
 # VM state. Forced runner termination can interrupt cleanup; ephemeral runner
 # disposal bounds remaining resources. Persistent runners and cloud resources
 # are outside this action's scope.
+#
+# Host-side test tools can use the returned `name` with `LIMA_HOME` set to `vm`.
+# Keep their SSH configuration private. If a scenario creates external resources,
+# verify its cleanup before calling `vm/destroy`; destruction cannot verify
+# application-specific resources such as remote browser devices.
 ---
 name: VM - Create
 description: Create an isolated Lima VM, rolling back resources if startup fails.
@@ -66,6 +73,9 @@ inputs:
   vm-config:
     description: Path to a Lima YAML file in the checkout. Plain mode is enforced.
     required: true
+  startup-timeout-minutes:
+    description: Guest startup timeout, from 1 to 40 minutes. The subprocess deadline includes one additional minute.
+    default: "10"
 outputs:
   vm:
     description: Private Lima runtime directory for subsequent VM actions; allocated before startup.
@@ -73,6 +83,9 @@ outputs:
   id:
     description: Unique identifier for this invocation.
     value: ${{ steps.create.outputs.id }}
+  name:
+    description: Lima instance name for host-side tools. Set LIMA_HOME to the vm output on the same runner.
+    value: ${{ steps.create.outputs.name }}
 runs:
   using: composite
   steps:
@@ -87,5 +100,6 @@ runs:
       env:
         VM_ACTION_PATH: ${{ github.action_path }}
         VM_CONFIG: ${{ inputs.vm-config }}
+        VM_STARTUP_TIMEOUT_MINUTES: ${{ inputs.startup-timeout-minutes }}
       with:
         script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });

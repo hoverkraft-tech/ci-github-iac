@@ -66,13 +66,20 @@ covers failures and repeated tests. No consumer Makefile is required.
 
 The action installs Lima and QEMU and allocates a private
 `/tmp/iac-<uid>-<random>` runtime. It exports `vm` before starting the guest so
-cleanup can retry after startup failure. Startup has an 11-minute subprocess
-deadline and rolls back partial creation. The runtime is retained if rollback
+cleanup can retry after startup failure. Startup defaults to ten minutes, with
+one additional minute for the subprocess deadline; `startup-timeout-minutes`
+allows longer provisioning. Failed startup rolls back partial creation.
+The runtime is retained if rollback
 cannot verify removal; keep the `always()` destruction step and let failures
 fail the job. Never upload the runtime directory, which contains SSH keys and
 VM state. Forced runner termination can interrupt cleanup; ephemeral runner
 disposal bounds remaining resources. Persistent runners and cloud resources
 are outside this action's scope.
+
+Host-side test tools can use the returned `name` with `LIMA_HOME` set to `vm`.
+Keep their SSH configuration private. If a scenario creates external resources,
+verify its cleanup before calling `vm/destroy`; destruction cannot verify
+application-specific resources such as remote browser devices.
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -80,11 +87,15 @@ are outside this action's scope.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@081afc2fec975206110e367af328afdb7b681dce # feat/phase-1-bootstrap
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@2b6495c4fd7dad081899d21186e4f554f3ca8d9c # feat/phase-1-bootstrap
   with:
     # Path to a Lima YAML file in the checkout. Plain mode is enforced.
     # This input is required.
     vm-config: ""
+
+    # Guest startup timeout, from 1 to 40 minutes. The subprocess deadline includes one additional minute.
+    # Default: `10`
+    startup-timeout-minutes: "10"
 ```
 
 <!-- usage:end -->
@@ -92,9 +103,10 @@ are outside this action's scope.
 
 ## Inputs
 
-| **Input**       | **Description**                                                   | **Required** | **Default** |
-| --------------- | ----------------------------------------------------------------- | ------------ | ----------- |
-| **`vm-config`** | Path to a Lima YAML file in the checkout. Plain mode is enforced. | **true**     | -           |
+| **Input**                     | **Description**                                                                                      | **Required** | **Default** |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- | ------------ | ----------- |
+| **`vm-config`**               | Path to a Lima YAML file in the checkout. Plain mode is enforced.                                    | **true**     | -           |
+| **`startup-timeout-minutes`** | Guest startup timeout, from 1 to 40 minutes. The subprocess deadline includes one additional minute. | **false**    | `10`        |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -103,10 +115,11 @@ are outside this action's scope.
 
 ## Outputs
 
-| **Output** | **Description**                                                                     |
-| ---------- | ----------------------------------------------------------------------------------- |
-| **`vm`**   | Private Lima runtime directory for subsequent VM actions; allocated before startup. |
-| **`id`**   | Unique identifier for this invocation.                                              |
+| **Output** | **Description**                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------ |
+| **`vm`**   | Private Lima runtime directory for subsequent VM actions; allocated before startup.        |
+| **`id`**   | Unique identifier for this invocation.                                                     |
+| **`name`** | Lima instance name for host-side tools. Set LIMA_HOME to the vm output on the same runner. |
 
 <!-- outputs:end -->
 <!-- examples:start -->
