@@ -7,8 +7,22 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /
+      - /tests/fixture/ansible
     cooldown:
       default-days: 7
     schedule:
       interval: weekly
+    groups:
+      docker-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /tests/fixture/ansible
+    cooldown:
+      default-days: 7
+    schedule:
+      interval: weekly
+    groups:
+      python-dependencies:
+        patterns: ["*"]

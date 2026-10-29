@@ -58,6 +58,13 @@ comments. Consumer workflows grant comment permissions and always schedule clean
 Unit tests exercise the action entrypoints and internal modules directly.
 Keep hosted boot checks alongside the mocked unit contracts.
 
+`__test-actions-ansible.yml` exercises native syntax checks in a pinned fixture
+image, including failures, continued checks and report publication. Ansible action
+logic lives entirely under `actions/ansible/test/`; it owns command execution and
+sanitized JUnit/SARIF reporting. Consumers supply their tooling image, playbooks
+and collections, and keep their integration scenarios. Dependabot maintains the
+fixture's Docker and pip dependencies.
+
 ## Releases and dependencies
 
 Use Conventional Commits and a reviewed pull request. Publish semantic versions

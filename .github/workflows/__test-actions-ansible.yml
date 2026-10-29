@@ -1,0 +1,69 @@
+---
+name: Internal - Test Ansible action
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [success, syntax-failure]
+    steps:
+      - name: Checkout fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build Ansible fixture image
+        run: docker build --tag ansible-fixture:local tests/fixture/ansible
+      - name: Prepare selected scenario without a consumer Makefile
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: |
+          rm Makefile
+          cp tests/fixture/ansible/valid.yml tests/fixture/ansible/selected.yml
+          if [ "$SCENARIO" = syntax-failure ]; then
+            printf '%s\n' '---' '- hosts: all' '  tasks:' '    - unknown_fixture_module: {}' > tests/fixture/ansible/selected.yml
+          fi
+      - name: Test playbooks
+        id: test
+        continue-on-error: true
+        uses: $/actions/ansible/test
+        with:
+          container-image: ansible-fixture:local
+          playbooks: |
+            tests/fixture/ansible/selected.yml
+            tests/fixture/ansible/valid.yml
+          collections: tests/fixture/ansible/ansible_collections/example/smoke
+          report-name: Ansible tests - ${{ matrix.scenario }}
+      - name: Verify check outcomes and reporting
+        if: ${{ always() }}
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          OUTCOME: ${{ steps.test.outcome }}
+          REPORTS: ${{ steps.test.outputs.report-files }}
+          PARSED: ${{ steps.test.outputs.parsed-files }}
+          SUMMARY: ${{ steps.test.outputs.summary }}
+          ARTIFACT: ${{ steps.test.outputs.artifact-id }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            const failed = process.env.SCENARIO === 'syntax-failure';
+            assert.equal(process.env.OUTCOME, failed ? 'failure' : 'success');
+            const files = process.env.REPORTS.split('\n');
+            assert.equal(files.length, 2);
+            assert.deepEqual(JSON.parse(process.env.PARSED).sort(), files.sort());
+            assert.ok(process.env.ARTIFACT);
+            assert.ok(process.env.SUMMARY);
+            const junit = fs.readFileSync(files.find(file => file.endsWith('.xml')), 'utf8');
+            assert.match(junit, /tests="3"/);
+            assert.ok(junit.includes(`failures="${failed ? 1 : 0}"`));
+            const sarif = JSON.parse(fs.readFileSync(files.find(file => file.endsWith('.sarif')), 'utf8'));
+            assert.equal(sarif.runs[0].results.length, failed ? 1 : 0);

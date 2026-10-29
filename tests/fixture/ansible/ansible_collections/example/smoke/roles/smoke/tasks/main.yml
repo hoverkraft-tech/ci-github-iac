@@ -1,0 +1,4 @@
+---
+- name: Provide a synthetic role for collection sanity checks
+  ansible.builtin.debug:
+    msg: Synthetic collection fixture

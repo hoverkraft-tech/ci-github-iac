@@ -1,0 +1,8 @@
+---
+- name: Validate syntax without applying a playbook
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Prevent accidental execution of the syntax fixture
+      ansible.builtin.fail:
+        msg: This playbook must only be syntax checked.
