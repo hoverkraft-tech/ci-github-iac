@@ -14,76 +14,73 @@
 
 ## Overview
 
-Compose official Ansible syntax and sanity actions with Hoverkraft reports, PR comments and artifacts.
+Run Ansible test playbooks and collection sanity with native reports, PR comments and artifacts.
 
-Validate Ansible by composing maintained upstream actions and Hoverkraft reporting.
+Run Ansible tests with maintained upstream actions and native JUnit reports.
 
-### Run checks
+### Run tests
 
-Check out the consumer on a fresh Linux GitHub-hosted runner. Provide the existing
-requirements file containing an exact `ansible-core==X.Y.Z` pin and either
-newline-separated playbook files or one collection directory. Use a workflow
-matrix for multiple collections. No consumer Make target or tooling image is needed.
+Check out the consumer on a fresh Linux GitHub-hosted runner. Supply its existing
+requirements file containing an exact `ansible-core==X.Y.Z` pin and either an
+explicit `test-playbook` or one `collection`. Use a matrix for multiple targets.
+Linting and playbook syntax checks belong in separate consumer jobs.
 
-Playbook validation uses [Ansible Lint](https://github.com/ansible/ansible-lint)
-with its `min` profile: content loading, parsing and native syntax checks. It
-produces SARIF directly. A uv constraint keeps Ansible Core at the consumer's
-pinned version. `galaxy-requirements` installs the consumer's role/collection
-dependencies; `collections-path` adds first-party collections to the search path.
+Test playbooks are executed by
+[dawidd6/action-ansible-playbook](https://github.com/dawidd6/action-ansible-playbook).
+The pinned Ansible Core is installed in a temporary virtual environment using
+the runner's Python; that Python must be supported by the selected Ansible Core.
+Ansible's built-in JUnit callback writes task results, including failed assertions.
+Provide test assertions and disposable targets, never a deployment playbook.
+`inventory`, `ansible-config`, `collections-path` and `galaxy-requirements`
+configure test execution. The action does not provision test environments.
 
-Collection validation uses the maintained Ansible community
-[ansible-test action](https://github.com/ansible-community/ansible-test-gh-action).
-It owns Python setup, the test container and native sanity/JUnit generation.
-The selected upstream revision pins its nested actions to full commit SHAs,
-matching consumers that enforce transitive action pinning.
-Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
-disabled for sanity checks. Source stays in the consumer's checked-out collection.
-Sanity checks cover all supported Python versions by default. Set
-`target-python-version` when the consumer supports a specific Python runtime.
-The upstream actions select their execution runtime; these checks do not
-reuse the consumer's deployment image or apply playbooks. Keep integration and
-deployment scenarios in the consumer.
+Collection sanity uses the maintained Ansible community
+[ansible-test action](https://github.com/ansible-community/ansible-test-gh-action),
+which owns Python setup, test containers and native JUnit generation.
+Its Ansible Core Git tag comes from the same requirements pin. Coverage is
+disabled for sanity checks. The selected upstream revision pins nested actions
+to full commit SHAs. Source stays in the consumer's checked-out collection.
+Sanity covers all supported Python versions unless `target-python-version`
+selects the consumer's supported runtime. These are sanity results, not code coverage.
 
 Paths must stay inside the checkout and use letters, digits, dots, underscores,
-hyphens and slashes. Explicit files are required; expand playbook globs in the
-workflow if needed. Each collection needs `galaxy.yml`. Use a fresh checkout per
+hyphens and slashes. Each collection needs `galaxy.yml`. Use a fresh checkout per
 collection job so native `tests/output/junit` contains only that run's reports.
 
 ### Publish results
 
-Native SARIF and JUnit files are parsed with Hoverkraft's `parse-ci-reports`,
-published as summaries and annotations, and attached to a stable PR comment.
-Native reports preserve upstream diagnostics; use synthetic data suitable for
-the repository's visibility. The collection action also publishes its own summary.
+Hoverkraft's `parse-ci-reports` publishes native JUnit as summaries, annotations
+and a stable PR comment. Test output and task results appear in these reports;
+use synthetic data suitable for the repository's visibility. The collection
+action also publishes its own summary.
 
 Report collection runs after upstream failures, including when the upstream
-action does not export its report output. Available files are copied to a fresh
-directory under `runner.temp` and uploaded with a unique artifact name and
-seven-day retention, including after parsing or commenting errors. Missing
-reports fail the action. Failed checks remain failures. No custom test runner,
-Docker lifecycle or JUnit/SARIF generator is maintained here.
+action does not export its report output. Reports are uploaded with a unique
+artifact name and seven-day retention, including after parsing or commenting
+errors. Missing reports fail the action. Failed tests remain failures. No custom
+test runner, Docker lifecycle or JUnit generator is maintained here.
 
 Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
-Never run untrusted checks through `pull_request_target`. Use distinct report
-names for matrix entries. Syntax and sanity results are not code coverage.
+Never run untrusted tests through `pull_request_target`. Use distinct report names
+for matrix entries.
 
 <!-- overview:end -->
 <!-- inputs:start -->
 
 ## Inputs
 
-| **Input**                   | **Description**                                                                                               | **Required** | **Default**            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
-| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                    | **true**     | -                      |
-| **`playbooks`**             | Newline-separated playbook files relative to the checkout. Supply playbooks or collection, exclusively.       | **false**    | -                      |
-| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.            | **false**    | -                      |
-| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core. | **false**    | -                      |
-| **`inventory`**             | Optional checkout-relative inventory file for syntax validation.                                              | **false**    | -                      |
-| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for syntax validation.                                            | **false**    | -                      |
-| **`collections-path`**      | Optional checkout-relative first-party collection search directory containing ansible_collections.            | **false**    | -                      |
-| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.         | **false**    | -                      |
-| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                             | **false**    | `Ansible test results` |
-| **`github-token`**          | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.                | **false**    | `${{ github.token }}`  |
+| **Input**                   | **Description**                                                                                                                    | **Required** | **Default**            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
+| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                         | **true**     | -                      |
+| **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively. | **false**    | -                      |
+| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                 | **false**    | -                      |
+| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                      | **false**    | -                      |
+| **`inventory`**             | Optional checkout-relative inventory file for test playbook execution.                                                             | **false**    | -                      |
+| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                           | **false**    | -                      |
+| **`collections-path`**      | Optional checkout-relative first-party collection search directory containing ansible_collections.                                 | **false**    | -                      |
+| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                              | **false**    | -                      |
+| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                  | **false**    | `Ansible test results` |
+| **`github-token`**          | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.                                     | **false**    | `${{ github.token }}`  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->

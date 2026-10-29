@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [syntax, sanity]
+        mode: [playbook, sanity]
         result: [success, failure]
     steps:
       - name: Checkout fixture
@@ -26,21 +26,18 @@ jobs:
           RESULT: ${{ matrix.result }}
         run: |
           rm Makefile
-          cp tests/fixture/ansible/valid.yml tests/fixture/ansible/selected.yml
-          if [ "$RESULT" = failure ]; then
-            if [ "$MODE" = syntax ]; then
-              printf '%s\n' '---' '- hosts: all' '  tasks:' '    - unknown_fixture_module: {}' > tests/fixture/ansible/selected.yml
-            else
-              printf '%s\n' '---' 'invalid: [' > tests/fixture/ansible/ansible_collections/example/smoke/roles/smoke/tasks/main.yml
-            fi
+          if [ "$RESULT" = failure ] && [ "$MODE" = sanity ]; then
+            printf '%s\n' '---' 'invalid: [' > tests/fixture/ansible/ansible_collections/example/smoke/roles/smoke/tasks/main.yml
           fi
       - name: Test Ansible with upstream actions
         id: test
         continue-on-error: true
         uses: $/actions/ansible/test
+        env:
+          FIXTURE_RESULT: ${{ matrix.result }}
         with:
           ansible-requirements: tests/fixture/ansible/requirements.txt
-          playbooks: ${{ matrix.mode == 'syntax' && 'tests/fixture/ansible/selected.yml' || '' }}
+          test-playbook: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/valid.yml' || '' }}
           collection: ${{ matrix.mode == 'sanity' && 'tests/fixture/ansible/ansible_collections/example/smoke' || '' }}
           report-name: Ansible tests - ${{ matrix.mode }} - ${{ matrix.result }}
       - name: Verify check outcomes and native reports
@@ -62,13 +59,6 @@ jobs:
             assert.ok(files.length > 0);
             assert.deepEqual(JSON.parse(process.env.PARSED).sort(), files.sort());
             assert.ok(process.env.ARTIFACT);
-            if (process.env.MODE === 'syntax') {
-              assert.equal(files.length, 1);
-              const sarif = JSON.parse(fs.readFileSync(files[0], 'utf8'));
-              const failures = sarif.runs.flatMap(run => run.results).filter(result => result.level === 'error');
-              assert.equal(failures.length > 0, process.env.EXPECTED === 'failure');
-            } else {
-              assert.ok(files.every(file => file.endsWith('.xml')));
-              const reports = files.map(file => fs.readFileSync(file, 'utf8')).join('\n');
-              assert.equal(/<failure\b/.test(reports), process.env.EXPECTED === 'failure');
-            }
+            assert.ok(files.every(file => file.endsWith('.xml')));
+            const reports = files.map(file => fs.readFileSync(file, 'utf8')).join('\n');
+            assert.equal(/<(?:failure|error)\b/.test(reports), process.env.EXPECTED === 'failure');
