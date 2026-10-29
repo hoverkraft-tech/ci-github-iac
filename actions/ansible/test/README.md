@@ -38,7 +38,9 @@ The selected upstream revision pins its nested actions to full commit SHAs,
 matching consumers that enforce transitive action pinning.
 Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
 disabled for sanity checks. Source stays in the consumer's checked-out collection.
-The upstream actions select their supported Python runtime; these checks do not
+Sanity checks cover all supported Python versions by default. Set
+`target-python-version` when the consumer supports a specific Python runtime.
+The upstream actions select their execution runtime; these checks do not
 reuse the consumer's deployment image or apply playbooks. Keep integration and
 deployment scenarios in the consumer.
 
@@ -70,17 +72,18 @@ names for matrix entries. Syntax and sanity results are not code coverage.
 
 ## Inputs
 
-| **Input**                  | **Description**                                                                                         | **Required** | **Default**            |
-| -------------------------- | ------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
-| **`ansible-requirements`** | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.              | **true**     | -                      |
-| **`playbooks`**            | Newline-separated playbook files relative to the checkout. Supply playbooks or collection, exclusively. | **false**    | -                      |
-| **`collection`**           | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.      | **false**    | -                      |
-| **`inventory`**            | Optional checkout-relative inventory file for syntax validation.                                        | **false**    | -                      |
-| **`ansible-config`**       | Optional checkout-relative ansible.cfg file for syntax validation.                                      | **false**    | -                      |
-| **`collections-path`**     | Optional checkout-relative first-party collection search directory containing ansible_collections.      | **false**    | -                      |
-| **`galaxy-requirements`**  | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.   | **false**    | -                      |
-| **`report-name`**          | Stable summary and PR comment title, distinct for each test step or matrix entry.                       | **false**    | `Ansible test results` |
-| **`github-token`**         | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.          | **false**    | `${{ github.token }}`  |
+| **Input**                   | **Description**                                                                                               | **Required** | **Default**            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
+| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                    | **true**     | -                      |
+| **`playbooks`**             | Newline-separated playbook files relative to the checkout. Supply playbooks or collection, exclusively.       | **false**    | -                      |
+| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.            | **false**    | -                      |
+| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core. | **false**    | -                      |
+| **`inventory`**             | Optional checkout-relative inventory file for syntax validation.                                              | **false**    | -                      |
+| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for syntax validation.                                            | **false**    | -                      |
+| **`collections-path`**      | Optional checkout-relative first-party collection search directory containing ansible_collections.            | **false**    | -                      |
+| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.         | **false**    | -                      |
+| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                             | **false**    | `Ansible test results` |
+| **`github-token`**          | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.                | **false**    | `${{ github.token }}`  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
