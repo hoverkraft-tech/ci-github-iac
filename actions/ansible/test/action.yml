@@ -16,6 +16,8 @@
 # Collection validation uses the maintained Ansible community
 # [ansible-test action](https://github.com/ansible-community/ansible-test-gh-action).
 # It owns Python setup, the test container and native sanity/JUnit generation.
+# The selected upstream revision pins its nested actions to full commit SHAs,
+# matching consumers that enforce transitive action pinning.
 # Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
 # disabled for sanity checks. Source stays in the consumer's checked-out collection.
 # The upstream actions select their supported Python runtime; these checks do not
@@ -131,7 +133,7 @@ runs:
     - name: Validate collection sanity with ansible-test
       id: sanity
       if: steps.inputs.outputs.mode == 'sanity'
-      uses: ansible-community/ansible-test-gh-action@6ded727edb598e670ac056a8e680ca4050bac0a3 # v1.18.0
+      uses: ansible-community/ansible-test-gh-action@dc5c5bfa02fa4b6633e6175e65e9f8f53088180a # unstable/v1
       with:
         testing-type: sanity
         ansible-core-version: ${{ steps.inputs.outputs.ansible-core-ref }}
