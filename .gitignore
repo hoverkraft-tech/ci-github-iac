@@ -1,6 +1,7 @@
 .cache/
 .reports/
 node_modules/
+tests/fixture/ansible/ansible_collections/*/*/tests/output/
 .env
 *.tfstate*
 *.tfplan
