@@ -31,9 +31,7 @@ ci: ## Execute local CI tasks
 	$(MAKE) test
 
 docs: ## Generate action documentation
-	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/vm/create/action.yml actions/vm/test/action.yml actions/vm/destroy/action.yml --repository git
-	# The new Ansible action has no released version for automatic usage examples.
-	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/ansible/test/action.yml --repository git --exclude-sections usage
+	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/ansible/test/action.yml actions/vm/create/action.yml actions/vm/test/action.yml actions/vm/destroy/action.yml --repository git
 
 #############################
 # Helpers

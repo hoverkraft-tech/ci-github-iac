@@ -87,7 +87,7 @@ application-specific resources such as remote browser devices.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@70843368d5f5f7b0a2cec1e8435d81cc40beee64 # 0.1.0
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
     # Path to a Lima YAML file in the checkout. Plain mode is enforced.
     # This input is required.

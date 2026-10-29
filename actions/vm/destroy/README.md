@@ -57,7 +57,7 @@ and cloud resource cleanup are outside scope.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@70843368d5f5f7b0a2cec1e8435d81cc40beee64 # 0.1.0
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
     # Private runtime directory returned by vm/create; repeated deletion is safe.
     # This input is required.
