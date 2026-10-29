@@ -42,6 +42,7 @@ test("syntax inputs keep the consumer's exact Ansible pin and native SARIF locat
 	entrypoint(f);
 	assert.deepEqual(f.failures, []);
 	assert.equal(f.outputs.mode, "syntax");
+	assert.equal(f.outputs["target-python-version"], "");
 	assert.equal(f.outputs["ansible-core-ref"], "v2.99.1");
 	assert.equal(
 		fs.readFileSync(f.outputs.constraint, "utf8"),
@@ -62,11 +63,17 @@ test("collection inputs select a single checked-out source with Galaxy metadata"
 	);
 	entrypoint({
 		...f,
-		env: { ...f.env, ANSIBLE_PLAYBOOKS: "", ANSIBLE_COLLECTION: collection },
+		env: {
+			...f.env,
+			ANSIBLE_PLAYBOOKS: "",
+			ANSIBLE_COLLECTION: collection,
+			ANSIBLE_TARGET_PYTHON_VERSION: "3.99",
+		},
 	});
 	assert.deepEqual(f.failures, []);
 	assert.equal(f.outputs.mode, "sanity");
 	assert.equal(f.outputs["collection-root"], collection);
+	assert.equal(f.outputs["target-python-version"], "3.99");
 });
 
 test("ambiguous selections, missing targets, non-pinned versions and escaping paths fail", (t) => {
@@ -83,6 +90,12 @@ test("ambiguous selections, missing targets, non-pinned versions and escaping pa
 		{ ANSIBLE_PLAYBOOKS: "outside" },
 		{ ANSIBLE_PLAYBOOKS: "../temp" },
 		{ ANSIBLE_REQUIREMENTS: "floating.txt" },
+		{ ANSIBLE_TARGET_PYTHON_VERSION: "3.99" },
+		{
+			ANSIBLE_PLAYBOOKS: "",
+			ANSIBLE_COLLECTION: ".",
+			ANSIBLE_TARGET_PYTHON_VERSION: "3.99; false",
+		},
 	]) {
 		f.failures.length = 0;
 		entrypoint({ ...f, env: { ...f.env, ...inputs } });

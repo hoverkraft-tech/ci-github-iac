@@ -20,7 +20,9 @@
 # matching consumers that enforce transitive action pinning.
 # Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
 # disabled for sanity checks. Source stays in the consumer's checked-out collection.
-# The upstream actions select their supported Python runtime; these checks do not
+# Sanity checks cover all supported Python versions by default. Set
+# `target-python-version` when the consumer supports a specific Python runtime.
+# The upstream actions select their execution runtime; these checks do not
 # reuse the consumer's deployment image or apply playbooks. Keep integration and
 # deployment scenarios in the consumer.
 #
@@ -62,6 +64,9 @@ inputs:
     default: ""
   collection:
     description: One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.
+    default: ""
+  target-python-version:
+    description: Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.
     default: ""
   inventory:
     description: Optional checkout-relative inventory file for syntax validation.
@@ -109,6 +114,7 @@ runs:
         ANSIBLE_REQUIREMENTS: ${{ inputs.ansible-requirements }}
         ANSIBLE_PLAYBOOKS: ${{ inputs.playbooks }}
         ANSIBLE_COLLECTION: ${{ inputs.collection }}
+        ANSIBLE_TARGET_PYTHON_VERSION: ${{ inputs.target-python-version }}
         ANSIBLE_INVENTORY_FILE: ${{ inputs.inventory }}
         ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
         ANSIBLE_COLLECTIONS_DIRECTORY: ${{ inputs.collections-path }}
@@ -139,6 +145,7 @@ runs:
         ansible-core-version: ${{ steps.inputs.outputs.ansible-core-ref }}
         collection-src-directory: ${{ github.workspace }}
         collection-root: ${{ steps.inputs.outputs.collection-root }}
+        target-python-version: ${{ steps.inputs.outputs.target-python-version }}
         test-deps: ${{ steps.inputs.outputs.galaxy != '' && format('-r {0}', steps.inputs.outputs.galaxy) || '' }}
         coverage: never
 

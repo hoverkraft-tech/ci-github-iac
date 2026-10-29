@@ -40,6 +40,13 @@ class AnsibleInputs {
 			),
 		];
 		const collection = this.env.ANSIBLE_COLLECTION?.trim();
+		const targetPython = this.env.ANSIBLE_TARGET_PYTHON_VERSION?.trim() || "";
+		if (targetPython && (!collection || !/^3\.[0-9]+$/.test(targetPython))) {
+			throw new Error(
+				"target-python-version requires a collection and a Python 3 major.minor version.",
+			);
+		}
+		this.core.setOutput("target-python-version", targetPython);
 		if (Boolean(playbooks.length) === Boolean(collection)) {
 			throw new Error(
 				"Provide playbooks or one collection, exclusively. Use a matrix for multiple collections.",
