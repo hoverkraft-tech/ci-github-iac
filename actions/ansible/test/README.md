@@ -14,78 +14,71 @@
 
 ## Overview
 
-Validate playbook syntax and collection sanity, publish reports and annotate pull requests.
+Compose official Ansible syntax and sanity actions with Hoverkraft reports, PR comments and artifacts.
 
-Validate Ansible playbooks and first-party collections in a consumer tooling image.
+Validate Ansible by composing maintained upstream actions and Hoverkraft reporting.
 
 ### Run checks
 
-Check out the consumer and build or pull its tooling image before this action.
-The Linux runner needs Docker. The image must provide `/bin/sh`, `ansible-playbook`,
-`ansible-test` and `python3`, with the consumer's pinned dependencies installed.
-No Makefile or reporting script is required. The image's entrypoint is replaced.
+Check out the consumer on a fresh Linux GitHub-hosted runner. Provide the existing
+requirements file containing an exact `ansible-core==X.Y.Z` pin and either
+newline-separated playbook files or one collection directory. Use a workflow
+matrix for multiple collections. No consumer Make target or tooling image is needed.
 
-```yaml
-- name: Test Ansible
-  uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@d2673efa2d13247d9a7ccf9fc2b6876fbf2d3435
-  with:
-    container-image: my-project-tooling:local
-    playbooks: ansible/site.yml
-    inventory: ansible/inventory.example.yml
-```
+Playbook validation uses [Ansible Lint](https://github.com/ansible/ansible-lint)
+with its `min` profile: content loading, parsing and native syntax checks. It
+produces SARIF directly. A uv constraint keeps Ansible Core at the consumer's
+pinned version. `galaxy-requirements` installs the consumer's role/collection
+dependencies; `collections-path` adds first-party collections to the search path.
 
-Supply newline-separated `playbooks`, `collections`, or both. Paths are explicit
-checkout-relative paths, without globs. Inventory is optional; when omitted,
-Ansible uses the image's configuration. Missing, empty and escaping paths fail.
-Collection roots must follow `ansible_collections/namespace/name` layout.
+Collection validation uses the maintained Ansible community
+[ansible-test action](https://github.com/ansible-community/ansible-test-gh-action).
+It owns Python setup, the test container and native sanity/JUnit generation.
+Its Ansible Core Git tag is derived from the same requirements pin. Coverage is
+disabled for sanity checks. Source stays in the consumer's checked-out collection.
+The upstream actions select their supported Python runtime; these checks do not
+reuse the consumer's deployment image or apply playbooks. Keep integration and
+deployment scenarios in the consumer.
 
-Each playbook runs with `ansible-playbook --syntax-check`. Each collection runs
-with `ansible-test sanity --python` using the image's Python version. Checks
-continue after a nonzero exit so all selected targets receive a result. Each
-command has a 20-minute timeout. Interrupted containers are forcibly removed.
-These checks do not apply playbooks or measure code coverage; integration and
-deployment scenarios remain in the consumer.
-
-The checkout is mounted at `/workspace` and commands start there (sanity starts
-in its collection directory). Containers run with the runner's UID/GID and a
-temporary home. Use `environment` for Ansible configuration, for example
-`ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections:/workspace/ansible/collections`.
-Image environment defaults remain available. Runner secrets are not forwarded.
-
-`cache-directory` optionally mounts a checkout-local directory for ansible-test
-virtual environments. Restore/save it with `actions/cache`, keyed by the tooling
-runtime. The action does not cache source files or reports. Sanity's normal
-`tests/output/` files remain in each collection and are not uploaded.
+Paths must stay inside the checkout and use letters, digits, dots, underscores,
+hyphens and slashes. Explicit files are required; expand playbook globs in the
+workflow if needed. Each collection needs `galaxy.yml`. Use a fresh checkout per
+collection job so native `tests/output/junit` contains only that run's reports.
 
 ### Publish results
 
-The action writes fresh JUnit status results for every executed check and SARIF
-locations for syntax failures under `runner.temp`. Raw command output remains
-in execution logs; report artifacts contain status and file locations only.
-Hoverkraft's parser publishes summaries and annotations. PR comments use a
-stable `report-name` and require `pull-requests: write`; forks and Dependabot
-skip comments. Never use `pull_request_target` to execute untrusted tests.
+Native SARIF and JUnit files are parsed with Hoverkraft's `parse-ci-reports`,
+published as summaries and annotations, and attached to a stable PR comment.
+Native reports preserve upstream diagnostics; use synthetic data suitable for
+the repository's visibility. The collection action also publishes its own summary.
 
-Completed reports are uploaded with unique artifact names and seven-day
-retention, including after checks or report publication fail. Neither a parser
-nor an upload can turn failed checks into success. Use a distinct report name
-for each invocation. Reports describe validation results, not code coverage.
+Report collection runs after upstream failures, including when the upstream
+action does not export its report output. Available files are copied to a fresh
+directory under `runner.temp` and uploaded with a unique artifact name and
+seven-day retention, including after parsing or commenting errors. Missing
+reports fail the action. Failed checks remain failures. No custom test runner,
+Docker lifecycle or JUnit/SARIF generator is maintained here.
+
+Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
+Never run untrusted checks through `pull_request_target`. Use distinct report
+names for matrix entries. Syntax and sanity results are not code coverage.
 
 <!-- overview:end -->
 <!-- inputs:start -->
 
 ## Inputs
 
-| **Input**             | **Description**                                                                                                            | **Required** | **Default**            |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
-| **`container-image`** | Built or pulled tooling image containing Ansible and the consumer's dependencies.                                          | **true**     | -                      |
-| **`playbooks`**       | Newline-separated nonempty playbook files relative to the checkout. Supply playbooks or collections.                       | **false**    | -                      |
-| **`inventory`**       | Optional inventory file relative to the checkout for syntax validation.                                                    | **false**    | -                      |
-| **`collections`**     | Newline-separated first-party collection directories relative to the checkout for sanity validation.                       | **false**    | -                      |
-| **`environment`**     | Newline-separated ANSIBLE_* assignments using container paths. ANSIBLE_HOME and ANSIBLE_NOCOLOR are managed by the action. | **false**    | -                      |
-| **`cache-directory`** | Optional checkout-relative directory for ansible-test virtual environments; manage persistence with actions/cache.         | **false**    | -                      |
-| **`report-name`**     | Stable summary and PR comment title, distinct for each test step.                                                          | **false**    | `Ansible test results` |
-| **`github-token`**    | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.                             | **false**    | `${{ github.token }}`  |
+| **Input**                  | **Description**                                                                                         | **Required** | **Default**            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
+| **`ansible-requirements`** | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.              | **true**     | -                      |
+| **`playbooks`**            | Newline-separated playbook files relative to the checkout. Supply playbooks or collection, exclusively. | **false**    | -                      |
+| **`collection`**           | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.      | **false**    | -                      |
+| **`inventory`**            | Optional checkout-relative inventory file for syntax validation.                                        | **false**    | -                      |
+| **`ansible-config`**       | Optional checkout-relative ansible.cfg file for syntax validation.                                      | **false**    | -                      |
+| **`collections-path`**     | Optional checkout-relative first-party collection search directory containing ansible_collections.      | **false**    | -                      |
+| **`galaxy-requirements`**  | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.   | **false**    | -                      |
+| **`report-name`**          | Stable summary and PR comment title, distinct for each test step or matrix entry.                       | **false**    | `Ansible test results` |
+| **`github-token`**         | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.          | **false**    | `${{ github.token }}`  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -94,13 +87,13 @@ for each invocation. Reports describe validation results, not code coverage.
 
 ## Outputs
 
-| **Output**         | **Description**                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| **`report-files`** | Newline-separated absolute paths of completed JUnit and SARIF reports, also after check failure. |
-| **`summary`**      | Parsed validation summary.                                                                       |
-| **`markdown`**     | Markdown used for the PR comment.                                                                |
-| **`parsed-files`** | JSON array of parsed report paths.                                                               |
-| **`artifact-id`**  | Uploaded report artifact identifier.                                                             |
+| **Output**         | **Description**                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| **`report-files`** | Newline-separated absolute paths of completed native reports, including after check failure. |
+| **`summary`**      | Parsed validation summary.                                                                   |
+| **`markdown`**     | Markdown used for the PR comment.                                                            |
+| **`parsed-files`** | JSON array of parsed report paths.                                                           |
+| **`artifact-id`**  | Uploaded report artifact identifier.                                                         |
 
 <!-- outputs:end -->
 <!-- examples:start -->
