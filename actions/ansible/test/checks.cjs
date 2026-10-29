@@ -146,29 +146,27 @@ class AnsibleChecks {
 				timeout: 20 * 60 * 1000,
 				maxBuffer: 8 * 1024 * 1024,
 			});
-			const output = `${result.stdout || ""}${result.stderr || ""}`;
-			this.core.info(output);
-			return {
-				code: result.error || result.signal ? 1 : result.status,
-				output,
-			};
-		} finally {
-			// A killed Docker client can leave its container running after a timeout.
-			if (!result || result.error || result.signal) {
-				const cleanup = this.run("docker", ["rm", "--force", name], {
-					encoding: "utf8",
-					timeout: 30000,
-				});
-				if (
-					cleanup.status !== 0 &&
-					!cleanup.stderr?.includes("No such container")
-				) {
-					throw new Error(
-						"Failed to remove the interrupted Ansible test container.",
-					);
-				}
+		} catch (error) {
+			result = { error };
+		}
+		// A killed Docker client can leave its container running after a timeout.
+		if (result.error || result.signal) {
+			const cleanup = this.run("docker", ["rm", "--force", name], {
+				encoding: "utf8",
+				timeout: 30000,
+			});
+			if (
+				cleanup.status !== 0 &&
+				!cleanup.stderr?.includes("No such container")
+			) {
+				throw new Error(
+					"Failed to remove the interrupted Ansible test container.",
+				);
 			}
 		}
+		const output = `${result.stdout || ""}${result.stderr || ""}`;
+		this.core.info(output);
+		return { code: result.error || result.signal ? 1 : result.status, output };
 	}
 
 	async execute() {

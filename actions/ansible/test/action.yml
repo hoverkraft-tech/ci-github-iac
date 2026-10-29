@@ -7,6 +7,15 @@
 # `ansible-test` and `python3`, with the consumer's pinned dependencies installed.
 # No Makefile or reporting script is required. The image's entrypoint is replaced.
 #
+# ```yaml
+# - name: Test Ansible
+#   uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@7bb6c22d7e9a9eded70627a001ea880a033e100d
+#   with:
+#     container-image: my-project-tooling:local
+#     playbooks: ansible/site.yml
+#     inventory: ansible/inventory.example.yml
+# ```
+#
 # Supply newline-separated `playbooks`, `collections`, or both. Paths are explicit
 # checkout-relative paths, without globs. Inventory is optional; when omitted,
 # Ansible uses the image's configuration. Missing, empty and escaping paths fail.
