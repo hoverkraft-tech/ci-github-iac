@@ -42,6 +42,7 @@ class VirtualMachine {
 	constructor(home) {
 		this.home = home;
 		this.validateRuntime();
+		this.sshConfig = path.join(home, "ssh.config");
 	}
 
 	static allocate() {
@@ -76,6 +77,15 @@ class VirtualMachine {
 		return this.command(["list", "--format", "{{.Name}}"])
 			.split("\n")
 			.includes(this.name);
+	}
+
+	copyTo(source, destination, options) {
+		if (!/^\/tmp\/iac-reports\.[a-zA-Z0-9]+\/[a-zA-Z0-9.-]+$/.test(destination))
+			throw new Error("Expected a private guest test file");
+		return this.command(
+			["copy", "--backend=scp", source, `${this.name}:${destination}`],
+			options,
+		);
 	}
 
 	destroy() {

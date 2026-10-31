@@ -1,5 +1,18 @@
 # Execute guest tests, collect reports and publish coverage results.
 #
+# ### Declarative VM assertions
+#
+# Supply `goss-file` for the opinionated Linux x86-64 testing mode. The action
+# downloads the checksum-pinned Goss release, renders the suite, its includes and
+# optional `goss-vars` on the runner, copies the binary and rendered suite to the
+# guest, and publishes native JUnit. The guest needs Bash, uname, chmod and an SSH
+# file-copy service. No Goss installation or report plumbing is needed in consumers.
+# The suite must execute at least one assertion. Use read-only state checks;
+# deployment, idempotence and reboot belong to Ansible Molecule scenarios.
+# Goss runs as the VM's SSH user; use an appropriate disposable test identity.
+# `goss-file` is exclusive with command, test-script, runner execution and report-file.
+# It produces test results, not code coverage; Codecov is unavailable in this mode.
+#
 # ### Execute guest commands
 #
 # Pass the `vm` output of [vm/create](../create/README.md) from the same job and
@@ -18,9 +31,9 @@
 # ### Runner-side tools
 #
 # Set `execution: runner` to run tools such as pytest or Ansible from the checkout.
-# The action supplies `VM_DIRECTORY`, `VM_NAME`, `LIMA_HOME` and, for direct QEMU,
-# `VM_SSH_CONFIG`. For example, `ssh -F "$VM_SSH_CONFIG" "$VM_NAME" uname -s`
-# targets the disposable QEMU guest. Install tool dependencies in the test command
+# The action supplies `VM_DIRECTORY`, `VM_NAME`, `LIMA_HOME` and `VM_SSH_CONFIG`
+# for both backends. For example, `ssh -F "$VM_SSH_CONFIG" "$VM_NAME" uname -s`
+# targets the disposable guest. Install tool dependencies in the test command
 # or preceding setup steps. These trusted commands inherit the runner environment;
 # provide only the permissions and credentials needed by the test.
 #
@@ -98,6 +111,12 @@ branding:
   icon: check-circle
   color: purple
 inputs:
+  goss-file:
+    description: Checkout-relative Goss suite. Installs the pinned verifier, runs guest assertions and publishes native JUnit; exclusive with command and test-script.
+    default: ""
+  goss-vars:
+    description: Optional checkout-relative JSON or YAML variables file for goss-file. Use synthetic values suitable for public test reports.
+    default: ""
   execution:
     description: Execute tests in the guest (default) or on the runner against the VM.
     default: guest
@@ -168,6 +187,8 @@ runs:
         TEST_COMMAND: ${{ inputs.command }}
         TEST_SCRIPT: ${{ inputs.test-script }}
         TEST_EXECUTION: ${{ inputs.execution }}
+        GOSS_FILE: ${{ inputs.goss-file }}
+        GOSS_VARS: ${{ inputs.goss-vars }}
         TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
         REPORT_FILE: ${{ inputs.report-file }}
         COVERAGE: ${{ inputs.coverage }}

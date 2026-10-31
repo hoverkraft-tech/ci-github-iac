@@ -125,7 +125,7 @@ inputs:
     default: "10"
 outputs:
   ssh-config:
-    description: Private SSH configuration for the direct-QEMU guest, using the iac-test host alias. Never upload it.
+    description: Private SSH configuration for either backend, using the returned name as host alias. Never upload it.
     value: ${{ steps.create.outputs.ssh-config }}
   vm:
     description: Private runtime directory for subsequent VM actions; allocated before startup.

@@ -54,6 +54,103 @@ jobs:
             exit 1
           report-file: native.xml
           report-name: QEMU runner reports
+      - name: Verify Goss valid suite
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: goss-valid
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          goss-file: tests/fixture/goss/valid.yaml
+          report-name: Goss - __test-actions-qemu.yml - valid - ${{ strategy.job-index }}
+      - name: Verify Goss invalid suite
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: goss-invalid
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          goss-file: tests/fixture/goss/invalid.yaml
+          report-name: Goss - __test-actions-qemu.yml - invalid - ${{ strategy.job-index }}
+      - name: Verify Goss empty suite
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: goss-empty
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          goss-file: tests/fixture/goss/empty.yaml
+          report-name: Goss - __test-actions-qemu.yml - empty - ${{ strategy.job-index }}
+      - name: Assert Goss outcomes and failure artifacts
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          VALID: ${{ steps.goss-valid.outcome }}
+          INVALID: ${{ steps.goss-invalid.outcome }}
+          EMPTY: ${{ steps.goss-empty.outcome }}
+          VALID_ARTIFACT: ${{ steps.goss-valid.outputs.artifact-id }}
+          INVALID_ARTIFACT: ${{ steps.goss-invalid.outputs.artifact-id }}
+          EMPTY_ARTIFACT: ${{ steps.goss-empty.outputs.artifact-id }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert.equal(process.env.VALID, 'success');
+            assert.equal(process.env.INVALID, 'failure');
+            assert.equal(process.env.EMPTY, 'failure');
+            for (const key of ['VALID_ARTIFACT', 'INVALID_ARTIFACT', 'EMPTY_ARTIFACT']) assert.ok(process.env[key]);
+      - name: Test Molecule success
+        id: molecule-success
+        continue-on-error: true
+        uses: $/actions/ansible/test
+        env:
+          IAC_FORCE_FAILURE: "false"
+          IAC_FORCE_CHANGE: "false"
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - success
+      - name: Test Molecule assertion-failure
+        id: molecule-assertion-failure
+        continue-on-error: true
+        uses: $/actions/ansible/test
+        env:
+          IAC_FORCE_FAILURE: "true"
+          IAC_FORCE_CHANGE: "false"
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - assertion-failure
+      - name: Test Molecule idempotence-failure
+        id: molecule-idempotence-failure
+        continue-on-error: true
+        uses: $/actions/ansible/test
+        env:
+          IAC_FORCE_FAILURE: "false"
+          IAC_FORCE_CHANGE: "true"
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - idempotence-failure
+      - name: Assert Molecule outcomes and failure reports
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SUCCESS: ${{ steps.molecule-success.outcome }}
+          ASSERTION_FAILURE: ${{ steps.molecule-assertion-failure.outcome }}
+          IDEMPOTENCE_FAILURE: ${{ steps.molecule-idempotence-failure.outcome }}
+          FAILURE_ARTIFACT: ${{ steps.molecule-assertion-failure.outputs.artifact-id }}
+          IDEMPOTENCE_ARTIFACT: ${{ steps.molecule-idempotence-failure.outputs.artifact-id }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert.equal(process.env.SUCCESS, 'success');
+            assert.equal(process.env.ASSERTION_FAILURE, 'failure');
+            assert.equal(process.env.IDEMPOTENCE_FAILURE, 'failure');
+            assert.ok(process.env.FAILURE_ARTIFACT);
+            assert.ok(process.env.IDEMPOTENCE_ARTIFACT);
       - name: Destroy direct QEMU guest
         id: destroy
         if: ${{ always() && steps.vm.outputs.vm != '' }}

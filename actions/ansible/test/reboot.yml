@@ -1,0 +1,9 @@
+---
+- name: Reboot the disposable VM
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Reboot and require a new boot identity
+      ansible.builtin.reboot:
+        reboot_timeout: 300

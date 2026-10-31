@@ -52,6 +52,20 @@ class QemuMachine {
 		return this.pid() !== undefined;
 	}
 
+	copyTo(source, destination, options) {
+		this.validateRuntime();
+		if (
+			!this.exists() ||
+			!/^\/tmp\/iac-reports\.[a-zA-Z0-9]+\/[a-zA-Z0-9.-]+$/.test(destination)
+		)
+			throw new Error("Expected a running VM and a private guest test file");
+		return run(
+			"scp",
+			["-F", this.sshConfig, "--", source, `${this.name}:${destination}`],
+			options,
+		);
+	}
+
 	command(args, options) {
 		this.validateRuntime();
 		if (!this.exists()) throw new Error("QEMU is not running");

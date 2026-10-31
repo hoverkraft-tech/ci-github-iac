@@ -1,0 +1,3 @@
+file:
+  /iac-missing-synthetic-file:
+    exists: true

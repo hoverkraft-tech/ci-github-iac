@@ -117,3 +117,17 @@ so rendering does not depend on installed fonts. Keep the
 [1280 × 640 PNG export](.github/social-preview.png) aligned with the SVG source.
 The preview embeds the logo geometry to remain self-contained; it is excluded
 from code duplication checks.
+
+## Opinionated VM verification
+
+`vm/test` owns Goss installation, checksum verification, rendering, guest execution
+and native reporting. Keep the release and archive checksum together in
+`actions/vm/test/goss.json`; verify both against the upstream release before updating.
+Its hosted fixtures cover Lima success and QEMU success, failed assertions and
+empty suites. Goss state checks should be read-only.
+
+`ansible/test` owns the pinned Molecule runtime and base sequence. Consumers supply
+Ansible-native scenarios with real convergence and verification playbooks. The
+workflow owns VM creation and destruction. QEMU integration exercises deployment,
+idempotence, reboot and native failure reports. Dependabot updates Molecule's
+requirements; validate the hosted scenarios before accepting an update.

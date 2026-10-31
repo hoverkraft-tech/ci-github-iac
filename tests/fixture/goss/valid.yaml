@@ -1,0 +1,6 @@
+command:
+  kernel:
+    exec: uname -s
+    exit-status: 0
+    stdout:
+      - Linux

@@ -1,5 +1,23 @@
 # Run Ansible tests with maintained upstream actions and native JUnit reports.
 #
+# ### Disposable VM deployment scenarios
+#
+# Supply `molecule-scenario` and the `vm` output of vm/create from the same job.
+# The scenario directory contains molecule.yml, converge.yml and verify.yml.
+# Use Ansible-native configuration; converge imports the real deployment playbook,
+# and verify contains explicit assertions. The action installs pinned Molecule,
+# generates an inventory containing only the disposable VM, and supplies a base
+# sequence: prepare, converge, verify, idempotence, side_effect, verify.
+# Default prepare waits for SSH; default side_effect reboots and verifies a new
+# boot identity. Scenarios can override playbooks and sequence using Molecule's
+# documented configuration. Do not add VM create/destroy or lint steps: the
+# workflow owns lifecycle and must always call vm/destroy, including after failure.
+# Set inventory-group when the deployment playbook targets a named inventory group.
+# Configure Galaxy dependencies through the scenario's native dependency settings.
+# The runner's Python must support the consumer's Ansible pin and Molecule.
+# Native task reports and a scenario result are published even after failure;
+# an empty native report set fails. Use no_log on tasks containing private values.
+#
 # ### Run tests
 #
 # Check out the consumer on a fresh Linux GitHub-hosted runner. Supply its existing
@@ -40,7 +58,8 @@
 # action does not export its report output. Reports are uploaded with a unique
 # artifact name and seven-day retention, including after parsing or commenting
 # errors. Missing reports fail the action. Failed tests remain failures. No custom
-# test runner, Docker lifecycle or JUnit generator is maintained here.
+# test runner or Docker lifecycle is maintained here. Molecule mode adds a small
+# status report so idempotence and timeout failures remain visible in summaries.
 #
 # Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
 # Never run untrusted tests through `pull_request_target`. Use distinct report names
@@ -53,6 +72,18 @@ branding:
   icon: check-circle
   color: purple
 inputs:
+  molecule-scenario:
+    description: Checkout-relative Ansible-native scenario directory containing molecule.yml, converge.yml and verify.yml. Exclusive with test-playbook and collection.
+    default: ""
+  vm:
+    description: Private runtime returned by vm/create in this job. Required for molecule-scenario; its generated inventory targets only this VM.
+    default: ""
+  inventory-group:
+    description: Inventory group assigned to the disposable VM in Molecule mode.
+    default: vm
+  test-timeout-minutes:
+    description: Molecule scenario deadline including reapplication and reboot, from 1 to 40 minutes.
+    default: "20"
   ansible-requirements:
     description: Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     required: true
@@ -116,18 +147,41 @@ runs:
         ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
         ANSIBLE_COLLECTIONS_DIRECTORY: ${{ inputs.collections-path }}
         ANSIBLE_GALAXY_REQUIREMENTS: ${{ inputs.galaxy-requirements }}
+        MOLECULE_SCENARIO: ${{ inputs.molecule-scenario }}
+        ANSIBLE_VM: ${{ inputs.vm }}
+        MOLECULE_INVENTORY_GROUP: ${{ inputs.inventory-group }}
+        ANSIBLE_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
       with:
         script: require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
 
     - name: Install the pinned Ansible test runtime
-      if: steps.inputs.outputs.mode == 'playbook'
+      if: steps.inputs.outputs.mode == 'playbook' || steps.inputs.outputs.mode == 'molecule'
       shell: bash
       env:
         REPORT_DIRECTORY: ${{ steps.inputs.outputs.report-directory }}
         REQUIREMENTS: ${{ steps.inputs.outputs.constraint }}
+        TEST_MODE: ${{ steps.inputs.outputs.mode }}
+        ANSIBLE_ACTION_PATH: ${{ github.action_path }}
       run: |
         python3 -m venv "$REPORT_DIRECTORY/venv"
         "$REPORT_DIRECTORY/venv/bin/pip" install --disable-pip-version-check -r "$REQUIREMENTS"
+        if [ "$TEST_MODE" = molecule ]; then
+          "$REPORT_DIRECTORY/venv/bin/pip" install --disable-pip-version-check -c "$REQUIREMENTS" -r "$ANSIBLE_ACTION_PATH/requirements.txt"
+        fi
+
+    - name: Test deployment, idempotence and reboot with Molecule
+      if: steps.inputs.outputs.mode == 'molecule'
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ANSIBLE_ACTION_PATH: ${{ github.action_path }}
+        ANSIBLE_PHASE: molecule
+        ANSIBLE_REPORT_DIRECTORY: ${{ steps.inputs.outputs.report-directory }}
+        MOLECULE_SCENARIO: ${{ steps.inputs.outputs.scenario }}
+        ANSIBLE_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+        ANSIBLE_CONFIG: ${{ steps.inputs.outputs.config }}
+        ANSIBLE_COLLECTIONS_PATH: ${{ steps.inputs.outputs.collections-path }}
+      with:
+        script: require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
 
     - name: Execute Ansible test playbook
       if: steps.inputs.outputs.mode == 'playbook'

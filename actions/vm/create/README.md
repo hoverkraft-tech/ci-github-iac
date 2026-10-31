@@ -165,12 +165,12 @@ Application readiness checks remain in consumer tests.
 
 ## Outputs
 
-| **Output**       | **Description**                                                                                      |
-| ---------------- | ---------------------------------------------------------------------------------------------------- |
-| **`ssh-config`** | Private SSH configuration for the direct-QEMU guest, using the iac-test host alias. Never upload it. |
-| **`vm`**         | Private runtime directory for subsequent VM actions; allocated before startup.                       |
-| **`id`**         | Unique identifier for this invocation.                                                               |
-| **`name`**       | Instance name. Lima tools also need LIMA_HOME set to vm; QEMU tools use ssh-config.                  |
+| **Output**       | **Description**                                                                                       |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| **`ssh-config`** | Private SSH configuration for either backend, using the returned name as host alias. Never upload it. |
+| **`vm`**         | Private runtime directory for subsequent VM actions; allocated before startup.                        |
+| **`id`**         | Unique identifier for this invocation.                                                                |
+| **`name`**       | Instance name. Lima tools also need LIMA_HOME set to vm; QEMU tools use ssh-config.                   |
 
 <!-- outputs:end -->
 <!-- examples:start -->

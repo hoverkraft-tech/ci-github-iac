@@ -8,7 +8,12 @@ module.exports = ({ core }) => {
 		if (process.env.COVERAGE === "codecov" && !process.env.REPORT_FILE?.trim())
 			throw new Error("Codecov requires explicitly selected reports");
 		const assertions = new GuestAssertions(
-			{ command: process.env.TEST_COMMAND, script: process.env.TEST_SCRIPT },
+			{
+				command: process.env.TEST_COMMAND,
+				script: process.env.TEST_SCRIPT,
+				goss: process.env.GOSS_FILE,
+				variables: process.env.GOSS_VARS,
+			},
 			process.env.RUNNER_TEMP,
 			process.env.TEST_TIMEOUT_MINUTES,
 			process.env.REPORT_FILE,

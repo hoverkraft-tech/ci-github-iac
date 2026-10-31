@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const { Workspace } = require("../_internal/workspace.cjs");
 
 class GuestCreation {
@@ -26,6 +27,12 @@ class GuestCreation {
 					this.template,
 				],
 				{ timeout: (this.startupTimeout + 1) * 60000 },
+			);
+			const config = vm.command(["show-ssh", "--format=config", vm.name]);
+			fs.writeFileSync(
+				vm.sshConfig,
+				config.replace(/^Host\s+.*$/m, `Host ${vm.name}`),
+				{ mode: 0o600, flag: "wx" },
 			);
 		} catch (error) {
 			vm.destroy();

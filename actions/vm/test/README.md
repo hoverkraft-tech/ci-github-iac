@@ -18,6 +18,19 @@ Run guest test commands, parse reports, comment on pull requests and upload resu
 
 Execute guest tests, collect reports and publish coverage results.
 
+### Declarative VM assertions
+
+Supply `goss-file` for the opinionated Linux x86-64 testing mode. The action
+downloads the checksum-pinned Goss release, renders the suite, its includes and
+optional `goss-vars` on the runner, copies the binary and rendered suite to the
+guest, and publishes native JUnit. The guest needs Bash, uname, chmod and an SSH
+file-copy service. No Goss installation or report plumbing is needed in consumers.
+The suite must execute at least one assertion. Use read-only state checks;
+deployment, idempotence and reboot belong to Ansible Molecule scenarios.
+Goss runs as the VM's SSH user; use an appropriate disposable test identity.
+`goss-file` is exclusive with command, test-script, runner execution and report-file.
+It produces test results, not code coverage; Codecov is unavailable in this mode.
+
 ### Execute guest commands
 
 Pass the `vm` output of [vm/create](../create/README.md) from the same job and
@@ -36,9 +49,9 @@ demonstrates composition and failure assertions.
 ### Runner-side tools
 
 Set `execution: runner` to run tools such as pytest or Ansible from the checkout.
-The action supplies `VM_DIRECTORY`, `VM_NAME`, `LIMA_HOME` and, for direct QEMU,
-`VM_SSH_CONFIG`. For example, `ssh -F "$VM_SSH_CONFIG" "$VM_NAME" uname -s`
-targets the disposable QEMU guest. Install tool dependencies in the test command
+The action supplies `VM_DIRECTORY`, `VM_NAME`, `LIMA_HOME` and `VM_SSH_CONFIG`
+for both backends. For example, `ssh -F "$VM_SSH_CONFIG" "$VM_NAME" uname -s`
+targets the disposable guest. Install tool dependencies in the test command
 or preceding setup steps. These trusted commands inherit the runner environment;
 provide only the permissions and credentials needed by the test.
 
@@ -117,6 +130,12 @@ No extra reporting steps are needed in the workflow.
 ```yaml
 - uses: hoverkraft-tech/ci-github-iac/actions/vm/test@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
+    # Checkout-relative Goss suite. Installs the pinned verifier, runs guest assertions and publishes native JUnit; exclusive with command and test-script.
+    goss-file: ""
+
+    # Optional checkout-relative JSON or YAML variables file for goss-file. Use synthetic values suitable for public test reports.
+    goss-vars: ""
+
     # Execute tests in the guest (default) or on the runner against the VM.
     # Default: `guest`
     execution: guest
@@ -166,24 +185,26 @@ No extra reporting steps are needed in the workflow.
 
 ## Inputs
 
-| **Input**                  | **Description**                                                                                                                                      | **Required** | **Default**           |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
-| **`execution`**            | Execute tests in the guest (default) or on the runner against the VM.                                                                                | **false**    | `guest`               |
-| **`vm`**                   | Private runtime directory returned by vm/create.                                                                                                     | **true**     | -                     |
-| **`command`**              | Bash command or multiline commands to execute in the chosen execution location. Guest commands start in /tmp; runner commands start in the checkout. | **false**    | -                     |
-|                            | Provide exactly one of command or test-script. Checkout files are not mounted in the guest.                                                          |              |                       |
-| **`test-script`**          | Nonempty Bash script in the checkout to execute instead of command.                                                                                  | **false**    | -                     |
-| **`test-timeout-minutes`** | Test command timeout, from 1 to 40 minutes.                                                                                                          | **false**    | `10`                  |
-| **`report-file`**          | Optional report paths or glob patterns relative to REPORTS_DIR in the chosen execution location.                                                     | **false**    | -                     |
-|                            | Separate patterns with newlines, commas or semicolons. Every pattern must match.                                                                     |              |                       |
-|                            | Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.                                                           |              |                       |
-|                            | Report contents are preserved. Use only reports suitable for public CI.                                                                              |              |                       |
-| **`coverage`**             | Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,                                                                     | **false**    | `github`              |
-|                            | or empty to disable reporting. Report artifacts are always retained.                                                                                 |              |                       |
-|                            | Codecov requires report-file selection and id-token write permission for OIDC.                                                                       |              |                       |
-| **`report-name`**          | Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.                                                     | **false**    | `VM test results`     |
-| **`path-mapping`**         | Optional path mappings forwarded to Hoverkraft's report parser.                                                                                      | **false**    | -                     |
-| **`github-token`**         | Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped.                                           | **false**    | `${{ github.token }}` |
+| **Input**                  | **Description**                                                                                                                                       | **Required** | **Default**           |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
+| **`goss-file`**            | Checkout-relative Goss suite. Installs the pinned verifier, runs guest assertions and publishes native JUnit; exclusive with command and test-script. | **false**    | -                     |
+| **`goss-vars`**            | Optional checkout-relative JSON or YAML variables file for goss-file. Use synthetic values suitable for public test reports.                          | **false**    | -                     |
+| **`execution`**            | Execute tests in the guest (default) or on the runner against the VM.                                                                                 | **false**    | `guest`               |
+| **`vm`**                   | Private runtime directory returned by vm/create.                                                                                                      | **true**     | -                     |
+| **`command`**              | Bash command or multiline commands to execute in the chosen execution location. Guest commands start in /tmp; runner commands start in the checkout.  | **false**    | -                     |
+|                            | Provide exactly one of command or test-script. Checkout files are not mounted in the guest.                                                           |              |                       |
+| **`test-script`**          | Nonempty Bash script in the checkout to execute instead of command.                                                                                   | **false**    | -                     |
+| **`test-timeout-minutes`** | Test command timeout, from 1 to 40 minutes.                                                                                                           | **false**    | `10`                  |
+| **`report-file`**          | Optional report paths or glob patterns relative to REPORTS_DIR in the chosen execution location.                                                      | **false**    | -                     |
+|                            | Separate patterns with newlines, commas or semicolons. Every pattern must match.                                                                      |              |                       |
+|                            | Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.                                                            |              |                       |
+|                            | Report contents are preserved. Use only reports suitable for public CI.                                                                               |              |                       |
+| **`coverage`**             | Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,                                                                      | **false**    | `github`              |
+|                            | or empty to disable reporting. Report artifacts are always retained.                                                                                  |              |                       |
+|                            | Codecov requires report-file selection and id-token write permission for OIDC.                                                                        |              |                       |
+| **`report-name`**          | Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.                                                      | **false**    | `VM test results`     |
+| **`path-mapping`**         | Optional path mappings forwarded to Hoverkraft's report parser.                                                                                       | **false**    | -                     |
+| **`github-token`**         | Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped.                                            | **false**    | `${{ github.token }}` |
 
 <!-- inputs:end -->
 <!-- secrets:start -->

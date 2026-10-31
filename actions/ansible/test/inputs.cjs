@@ -33,6 +33,7 @@ class AnsibleInputs {
 	prepare() {
 		const playbook = this.env.ANSIBLE_TEST_PLAYBOOK?.trim();
 		const collection = this.env.ANSIBLE_COLLECTION?.trim();
+		const scenario = this.env.MOLECULE_SCENARIO?.trim();
 		const targetPython = this.env.ANSIBLE_TARGET_PYTHON_VERSION?.trim() || "";
 		if (targetPython && (!collection || !/^3\.[0-9]+$/.test(targetPython))) {
 			throw new Error(
@@ -40,9 +41,9 @@ class AnsibleInputs {
 			);
 		}
 		this.core.setOutput("target-python-version", targetPython);
-		if (Boolean(playbook) === Boolean(collection)) {
+		if ([playbook, collection, scenario].filter(Boolean).length !== 1) {
 			throw new Error(
-				"Provide test-playbook or one collection, exclusively. Use a matrix for multiple collections.",
+				"Provide exactly one test-playbook, collection or molecule-scenario. Use a matrix for multiple targets.",
 			);
 		}
 		const requirements = this.checkoutPath(this.env.ANSIBLE_REQUIREMENTS);
@@ -88,12 +89,24 @@ class AnsibleInputs {
 		const reports = fs.mkdtempSync(
 			path.join(this.env.RUNNER_TEMP, "ansible-reports-"),
 		);
-		if (playbook) this.core.addPath(path.join(reports, "venv/bin"));
+		if (playbook || scenario) this.core.addPath(path.join(reports, "venv/bin"));
+		if (scenario) {
+			const { MoleculeScenario } = require("./molecule.cjs");
+			const selected = this.checkoutPath(scenario, true);
+			for (const file of ["molecule.yml", "converge.yml", "verify.yml"])
+				this.checkoutPath(path.join(selected, file));
+			new MoleculeScenario(this.env).prepare(reports, selected);
+			this.core.setOutput("scenario", selected);
+		} else if (this.env.ANSIBLE_VM?.trim())
+			throw new Error("vm requires molecule-scenario");
 		const constraint = path.join(reports, "constraints.txt");
 		fs.writeFileSync(constraint, `ansible-core==${pins[0][1]}\n`);
 		this.core.setOutput("constraint", constraint);
 		this.core.setOutput("ansible-core-ref", `v${pins[0][1]}`);
-		this.core.setOutput("mode", collection ? "sanity" : "playbook");
+		this.core.setOutput(
+			"mode",
+			scenario ? "molecule" : collection ? "sanity" : "playbook",
+		);
 		this.core.setOutput("collection", collectionRoot);
 		this.core.setOutput(
 			"collection-root",

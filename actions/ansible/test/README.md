@@ -18,6 +18,24 @@ Run Ansible test playbooks and collection sanity with native reports, PR comment
 
 Run Ansible tests with maintained upstream actions and native JUnit reports.
 
+### Disposable VM deployment scenarios
+
+Supply `molecule-scenario` and the `vm` output of vm/create from the same job.
+The scenario directory contains molecule.yml, converge.yml and verify.yml.
+Use Ansible-native configuration; converge imports the real deployment playbook,
+and verify contains explicit assertions. The action installs pinned Molecule,
+generates an inventory containing only the disposable VM, and supplies a base
+sequence: prepare, converge, verify, idempotence, side_effect, verify.
+Default prepare waits for SSH; default side_effect reboots and verifies a new
+boot identity. Scenarios can override playbooks and sequence using Molecule's
+documented configuration. Do not add VM create/destroy or lint steps: the
+workflow owns lifecycle and must always call vm/destroy, including after failure.
+Set inventory-group when the deployment playbook targets a named inventory group.
+Configure Galaxy dependencies through the scenario's native dependency settings.
+The runner's Python must support the consumer's Ansible pin and Molecule.
+Native task reports and a scenario result are published even after failure;
+an empty native report set fails. Use no_log on tasks containing private values.
+
 ### Run tests
 
 Check out the consumer on a fresh Linux GitHub-hosted runner. Supply its existing
@@ -58,7 +76,8 @@ Report collection runs after upstream failures, including when the upstream
 action does not export its report output. Reports are uploaded with a unique
 artifact name and seven-day retention, including after parsing or commenting
 errors. Missing reports fail the action. Failed tests remain failures. No custom
-test runner, Docker lifecycle or JUnit generator is maintained here.
+test runner or Docker lifecycle is maintained here. Molecule mode adds a small
+status report so idempotence and timeout failures remain visible in summaries.
 
 Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
 Never run untrusted tests through `pull_request_target`. Use distinct report names
@@ -69,18 +88,22 @@ for matrix entries.
 
 ## Inputs
 
-| **Input**                   | **Description**                                                                                                                    | **Required** | **Default**            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
-| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                         | **true**     | -                      |
-| **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively. | **false**    | -                      |
-| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                 | **false**    | -                      |
-| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                      | **false**    | -                      |
-| **`inventory`**             | Optional checkout-relative inventory file for test playbook execution.                                                             | **false**    | -                      |
-| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                           | **false**    | -                      |
-| **`collections-path`**      | Optional checkout-relative first-party collection search directory containing ansible_collections.                                 | **false**    | -                      |
-| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                              | **false**    | -                      |
-| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                  | **false**    | `Ansible test results` |
-| **`github-token`**          | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.                                     | **false**    | `${{ github.token }}`  |
+| **Input**                   | **Description**                                                                                                                                        | **Required** | **Default**            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | ---------------------- |
+| **`molecule-scenario`**     | Checkout-relative Ansible-native scenario directory containing molecule.yml, converge.yml and verify.yml. Exclusive with test-playbook and collection. | **false**    | -                      |
+| **`vm`**                    | Private runtime returned by vm/create in this job. Required for molecule-scenario; its generated inventory targets only this VM.                       | **false**    | -                      |
+| **`inventory-group`**       | Inventory group assigned to the disposable VM in Molecule mode.                                                                                        | **false**    | `vm`                   |
+| **`test-timeout-minutes`**  | Molecule scenario deadline including reapplication and reboot, from 1 to 40 minutes.                                                                   | **false**    | `20`                   |
+| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                             | **true**     | -                      |
+| **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively.                     | **false**    | -                      |
+| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                                     | **false**    | -                      |
+| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                                          | **false**    | -                      |
+| **`inventory`**             | Optional checkout-relative inventory file for test playbook execution.                                                                                 | **false**    | -                      |
+| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                                               | **false**    | -                      |
+| **`collections-path`**      | Optional checkout-relative first-party collection search directory containing ansible_collections.                                                     | **false**    | -                      |
+| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                                                  | **false**    | -                      |
+| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                                      | **false**    | `Ansible test results` |
+| **`github-token`**          | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.                                                         | **false**    | `${{ github.token }}`  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -120,6 +143,20 @@ This documentation was automatically generated by [CI Dokumentor](https://github
 ```yaml
 - uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
+    # Checkout-relative Ansible-native scenario directory containing molecule.yml, converge.yml and verify.yml. Exclusive with test-playbook and collection.
+    molecule-scenario: ""
+
+    # Private runtime returned by vm/create in this job. Required for molecule-scenario; its generated inventory targets only this VM.
+    vm: ""
+
+    # Inventory group assigned to the disposable VM in Molecule mode.
+    # Default: `vm`
+    inventory-group: vm
+
+    # Molecule scenario deadline including reapplication and reboot, from 1 to 40 minutes.
+    # Default: `20`
+    test-timeout-minutes: "20"
+
     # Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     # This input is required.
     ansible-requirements: ""

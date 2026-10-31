@@ -1,0 +1,12 @@
+---
+- name: Apply a disposable test configuration
+  hosts: vm
+  gather_facts: false
+  tasks:
+    - name: Write the fixture marker
+      ansible.builtin.copy:
+        dest: /tmp/iac-molecule-marker
+        content: "synthetic fixture\n"
+        mode: "0600"
+      register: marker
+      changed_when: marker.changed or lookup('env', 'IAC_FORCE_CHANGE') == 'true'
