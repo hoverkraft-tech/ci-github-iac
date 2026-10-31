@@ -5,7 +5,7 @@
   tasks:
     - name: Write the fixture marker
       ansible.builtin.copy:
-        dest: /tmp/iac-molecule-marker
+        dest: /var/tmp/iac-molecule-marker
         content: "synthetic fixture\n"
         mode: "0600"
       register: marker

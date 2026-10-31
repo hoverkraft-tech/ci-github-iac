@@ -5,7 +5,7 @@
   tasks:
     - name: Read the fixture marker
       ansible.builtin.slurp:
-        src: /tmp/iac-molecule-marker
+        src: /var/tmp/iac-molecule-marker
       register: marker
     - name: Assert the expected content
       ansible.builtin.assert:
