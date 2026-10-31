@@ -12,9 +12,10 @@ module.exports = ({ core }) => {
 			process.env.RUNNER_TEMP,
 			process.env.TEST_TIMEOUT_MINUTES,
 			process.env.REPORT_FILE,
+			process.env.TEST_EXECUTION,
 		);
 		try {
-			assertions.run(new VirtualMachine(process.env.VM_DIRECTORY));
+			assertions.run(VirtualMachine.open(process.env.VM_DIRECTORY));
 		} finally {
 			if (assertions.report || assertions.reportFiles?.length)
 				core.setOutput("id", assertions.id);

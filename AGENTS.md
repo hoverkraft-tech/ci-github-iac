@@ -12,7 +12,7 @@ Follow the [Hoverkraft engineering guidance](https://github.com/hoverkraft-tech/
 - Use `actions/github-script` for action logic and native Actions helpers for outputs
   and failures. Put each action entrypoint in `index.cjs` beside its `action.yml`;
   keep only the module-loading call in YAML. Keep creation logic under create/ and
-  assertions and report collection under test/. Limit _internal/ to Lima commands,
+  assertions and report collection under test/. Limit _internal/ to backend commands,
   private runtime ownership, verified cleanup and checkout path validation.
   Validate these modules with Node.js unit tests and hosted action workflows.
 - Use synthetic fixtures without account credentials. Never upload VM disks, state,

@@ -15,7 +15,7 @@
 ## Overview
 
 GitHub Actions for validating Ansible and testing infrastructure changes in disposable virtual machines.
-Create a Lima and QEMU guest from your configuration, run your checks, publish
+Create a Lima or direct-QEMU guest from your configuration, run your checks, publish
 test and coverage reports, and verify that the guest is removed afterward.
 
 Your repository supplies the guest configuration and test scenario. The actions
@@ -40,7 +40,7 @@ roll back resources if startup fails.
 
 #### - [Test VM](actions/vm/test/README.md)
 
-Run Bash commands or a script inside the guest and collect test-generated reports,
+Run Bash commands or a script in the guest or on the runner and collect test-generated reports,
 including after test failure. Publish GitHub summaries, annotations, PR comments
 and report artifacts, with optional Codecov upload.
 

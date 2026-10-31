@@ -14,7 +14,7 @@
 
 ## Overview
 
-Delete an owned Lima VM, verify deletion and remove its runtime directory.
+Delete an owned VM, verify deletion and remove its runtime directory.
 
 Destroy the guest and verify absence before removing its private runtime and keys.
 
@@ -40,7 +40,10 @@ additional GitHub permission is needed. Do not suppress cleanup failures.
 Destruction accepts only an owned private runtime created by `vm/create`. It
 verifies guest absence before deleting the runtime and SSH keys. `removed` is
 true only after verified cleanup. Lima deletion and verification commands have
-two-minute deadlines and a 1 MiB output limit per stream.
+two-minute deadlines and a 1 MiB output limit per stream. Direct QEMU cleanup
+verifies the PID, owner and runtime arguments before signaling the process. It
+allows 15 seconds after SIGTERM, then 15 seconds after SIGKILL, and verifies
+termination before deleting the private runtime.
 
 Failed cleanup fails the step and retains the runtime for recovery. Retry with
 another `vm/destroy` step using `if: always()` and the original `vm` output on
