@@ -168,3 +168,27 @@ test("runner report selection cannot follow symlinks or succeed with missing rep
 	assert.deepEqual(assertions.reportFiles, []);
 	assert.equal(fs.readFileSync("key", "utf8"), "synthetic");
 });
+
+test("runner tools cannot consume subsequent commands from script stdin", (t) => {
+	const { vm, root } = fixture(t);
+	t.mock.method(vm, "exists", () => true);
+	const assertions = new GuestAssertions(
+		{
+			command:
+				'cat >/dev/null\nprintf "<testsuite/>" > "$REPORTS_DIR/native.xml"\n',
+		},
+		root,
+		"1",
+		"*.xml",
+		"runner",
+	);
+	assertions.run(vm);
+	assert.equal(
+		fs.readFileSync(assertions.reportFiles[0], "utf8"),
+		"<testsuite/>",
+	);
+	assert.equal(
+		fs.existsSync(path.join(path.dirname(assertions.report), "command.sh")),
+		false,
+	);
+});

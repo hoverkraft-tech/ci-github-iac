@@ -62,29 +62,34 @@ class GuestAssertions {
 			const environment = this.guestReports.prepare(vm, directory);
 			if (this.execution === "runner") {
 				if (!vm.exists()) throw new Error("VM is not running");
-				run(
-					"timeout",
-					[
-						"--kill-after=5s",
-						`${this.timeout / 1000}s`,
-						"bash",
-						"-euo",
-						"pipefail",
-						"-s",
-					],
-					{
-						input: command,
-						timeout: this.timeout + 10000,
-						env: {
-							...process.env,
-							...environment,
-							VM_DIRECTORY: vm.home,
-							VM_NAME: vm.name,
-							VM_SSH_CONFIG: vm.sshConfig ?? "",
-							LIMA_HOME: vm.home,
+				const script = path.join(directory, "command.sh");
+				fs.writeFileSync(script, command, { mode: 0o600, flag: "wx" });
+				try {
+					run(
+						"timeout",
+						[
+							"--kill-after=5s",
+							`${this.timeout / 1000}s`,
+							"bash",
+							"-euo",
+							"pipefail",
+							script,
+						],
+						{
+							timeout: this.timeout + 10000,
+							env: {
+								...process.env,
+								...environment,
+								VM_DIRECTORY: vm.home,
+								VM_NAME: vm.name,
+								VM_SSH_CONFIG: vm.sshConfig ?? "",
+								LIMA_HOME: vm.home,
+							},
 						},
-					},
-				);
+					);
+				} finally {
+					fs.rmSync(script, { force: true });
+				}
 			} else
 				vm.command(
 					[
