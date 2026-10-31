@@ -17,6 +17,7 @@ scenario:
     - idempotence
     - side_effect
     - verify
+    - idempotence
 shared_state: false
 verifier:
   name: ansible
