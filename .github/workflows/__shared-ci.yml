@@ -36,6 +36,11 @@ jobs:
       contents: read
       pull-requests: write
     uses: $/.github/workflows/__test-actions-vm.yml
+  qemu:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: $/.github/workflows/__test-actions-qemu.yml
   ansible:
     permissions:
       contents: read
@@ -43,7 +48,7 @@ jobs:
     uses: $/.github/workflows/__test-actions-ansible.yml
   checks:
     if: ${{ always() }}
-    needs: [tests, linter, vm, ansible]
+    needs: [tests, linter, vm, qemu, ansible]
     runs-on: ubuntu-latest
     steps:
       - name: Require all checks

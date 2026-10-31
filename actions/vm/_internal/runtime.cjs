@@ -2,54 +2,73 @@ const fs = require("node:fs");
 const path = require("node:path");
 const childProcess = require("node:child_process");
 
+function validateDirectory(home, parent, prefix) {
+	if (
+		typeof home !== "string" ||
+		path.dirname(home) !== parent ||
+		!path.basename(home).startsWith(prefix)
+	)
+		throw new Error("Expected an invocation's private runtime");
+	const info = fs.lstatSync(home, { throwIfNoEntry: false });
+	if (!info) return;
+	if (!info.isDirectory() || info.uid !== process.getuid() || info.mode & 0o077)
+		throw new Error(
+			"VM runtime must be a private directory owned by this user",
+		);
+}
+
+function run(
+	program,
+	args,
+	{ timeout = 120000, input, env = process.env } = {},
+) {
+	const result = childProcess.spawnSync(program, args, {
+		env,
+		input,
+		encoding: "utf8",
+		stdio: "pipe",
+		timeout,
+		killSignal: "SIGKILL",
+		maxBuffer: 1024 * 1024,
+	});
+	if (result.error || result.status !== 0)
+		throw new Error("VM command failed or timed out");
+	return result.stdout.trim();
+}
+
 class VirtualMachine {
 	name = "iac-test";
 
 	constructor(home) {
 		this.home = home;
 		this.validateRuntime();
+		this.sshConfig = path.join(home, "ssh.config");
 	}
 
 	static allocate() {
 		return new VirtualMachine(fs.mkdtempSync(`/tmp/iac-${process.getuid()}-`));
 	}
 
+	static open(home) {
+		if (typeof home === "string" && path.dirname(home) === "/var/tmp") {
+			const { QemuMachine } = require("./qemu.cjs");
+			return new QemuMachine(home);
+		}
+		return new VirtualMachine(home);
+	}
+
 	validateRuntime() {
-		if (
-			path.dirname(this.home) !== "/tmp" ||
-			!path.basename(this.home).startsWith(`iac-${process.getuid()}-`)
-		) {
-			throw new Error("Expected an invocation's private Lima home");
-		}
-		const info = fs.lstatSync(this.home, { throwIfNoEntry: false });
-		if (!info) return; // Repeated destruction is safe after verified removal.
-		if (
-			!info.isDirectory() ||
-			info.uid !== process.getuid() ||
-			info.mode & 0o077
-		) {
-			throw new Error(
-				"VM runtime must be a private directory owned by this user",
-			);
-		}
+		validateDirectory(this.home, "/tmp", `iac-${process.getuid()}-`);
 	}
 
 	command(args, { timeout = 120000, input } = {}) {
 		this.validateRuntime();
 		if (!fs.existsSync(this.home)) throw new Error("VM runtime is absent");
-		const result = childProcess.spawnSync("limactl", args, {
+		return run("limactl", args, {
 			env: { ...process.env, LIMA_HOME: this.home },
 			input,
-			encoding: "utf8",
-			stdio: "pipe",
 			timeout,
-			killSignal: "SIGKILL",
-			maxBuffer: 1024 * 1024,
 		});
-		// Never expose raw CLI output or exception details in public action logs.
-		if (result.error || result.status !== 0)
-			throw new Error("VM command failed or timed out");
-		return result.stdout.trim();
 	}
 
 	exists() {
@@ -58,6 +77,15 @@ class VirtualMachine {
 		return this.command(["list", "--format", "{{.Name}}"])
 			.split("\n")
 			.includes(this.name);
+	}
+
+	copyTo(source, destination, options) {
+		if (!/^\/tmp\/iac-reports\.[a-zA-Z0-9]+\/[a-zA-Z0-9.-]+$/.test(destination))
+			throw new Error("Expected a private guest test file");
+		return this.command(
+			["copy", "--backend=scp", source, `${this.name}:${destination}`],
+			options,
+		);
 	}
 
 	destroy() {
@@ -70,4 +98,4 @@ class VirtualMachine {
 	}
 }
 
-module.exports = { VirtualMachine };
+module.exports = { VirtualMachine, validateDirectory, run };

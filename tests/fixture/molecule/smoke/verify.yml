@@ -1,0 +1,14 @@
+---
+- name: Verify the disposable test configuration
+  hosts: vm
+  gather_facts: false
+  tasks:
+    - name: Read the fixture marker
+      ansible.builtin.slurp:
+        src: /var/tmp/iac-molecule-marker
+      register: marker
+    - name: Assert the expected content
+      ansible.builtin.assert:
+        that:
+          - (marker.content | b64decode) == "synthetic fixture\n"
+          - lookup('env', 'IAC_FORCE_FAILURE') != 'true'

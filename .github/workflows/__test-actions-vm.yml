@@ -102,6 +102,13 @@ jobs:
           report-name: VM tests - ${{ matrix.scenario }} - reporting failure
           # A synthetic invalid token must fail commenting, not test execution or artifact upload.
           github-token: synthetic-invalid-token
+      - name: Validate declarative state on Lima
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: $/actions/vm/test
+        with:
+          goss-file: tests/fixture/goss/valid.yaml
+          vm: ${{ steps.vm.outputs.vm }}
+          report-name: Lima state - ${{ matrix.scenario }}
       - name: Destroy VM
         if: ${{ always() && steps.vm.outputs.vm != '' }}
         id: destroy

@@ -2,7 +2,7 @@ const { VirtualMachine } = require("../_internal/runtime.cjs");
 
 module.exports = ({ core }) => {
 	try {
-		new VirtualMachine(process.env.VM_DIRECTORY).destroy();
+		VirtualMachine.open(process.env.VM_DIRECTORY).destroy();
 		core.setOutput("removed", "true");
 	} catch {
 		core.setFailed(

@@ -14,9 +14,9 @@
 
 ## Overview
 
-Create an isolated Lima VM, rolling back resources if startup fails.
+Create an isolated disposable VM, rolling back resources if startup fails.
 
-Create a disposable Lima guest and return its private runtime directory.
+Create a disposable Lima or direct-QEMU guest and return its private runtime directory.
 
 ### Runner and configuration
 
@@ -81,6 +81,51 @@ Keep their SSH configuration private. If a scenario creates external resources,
 verify its cleanup before calling `vm/destroy`; destruction cannot verify
 application-specific resources such as remote browser devices.
 
+### Direct QEMU
+
+Set `backend: qemu` for an unattended installer that cannot run inside a Lima
+guest. QEMU runs directly on the runner using KVM, UEFI and a private raw disk
+under `/var/tmp/iac-qemu-<uid>-<random>`. Lima's maintained setup action installs
+the host dependencies; this backend does not start a Lima guest.
+Supply a JSON `vm-config` with explicit resources, media, network and SSH identity:
+
+```json
+{
+  "cpus": 2,
+  "memoryMiB": 4096,
+  "diskGiB": 32,
+  "diskSerial": "TEST_DISK",
+  "iso": ".local/test/installer.iso",
+  "network": {
+    "subnet": "192.0.2.0/24",
+    "address": "192.0.2.10",
+    "gateway": "192.0.2.1",
+    "dns": "192.0.2.2",
+    "mac": "02:00:00:00:00:01"
+  },
+  "ssh": { "user": "root", "privateKey": ".local/test/key" }
+}
+```
+
+All media and keys must be regular checkout files. Use synthetic credentials.
+Consumers verify downloads and prepare the ISO's unattended answer with matching
+network, disk serial and SSH public key. The installer must power off on success;
+the action then boots the installed disk without the ISO and waits for SSH.
+Alternatively replace `iso` with a trusted `image` (QCOW2), optionally supplying
+a cloud-init `seed` ISO. The image is converted to a private raw disk, then resized.
+Images must fit diskGiB. No arbitrary QEMU arguments or host disks are accepted.
+Limits are 1–16 CPUs, 1–65536 MiB memory and 1–128 GiB disk. The runner must have
+sufficient disk-backed storage and memory. Network addresses must be distinct
+hosts in the supplied IPv4 subnet (prefix 8–30); MAC addresses start with `02`.
+
+SSH is exposed on a dynamically allocated loopback port, with a private key and
+known-hosts file. Initial trust is confined to that owned endpoint; later calls
+require the recorded host key. Use `ssh -F <ssh-config> iac-test` for host tools.
+One startup deadline covers preparation, installation and SSH readiness. Startup
+failure attempts verified rollback; always schedule `vm/destroy` to retry cleanup.
+Reports belong to `vm/test`; no raw console logs, keys or VM state are published.
+Application readiness checks remain in consumer tests.
+
 <!-- overview:end -->
 <!-- usage:start -->
 
@@ -89,7 +134,11 @@ application-specific resources such as remote browser devices.
 ```yaml
 - uses: hoverkraft-tech/ci-github-iac/actions/vm/create@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
-    # Path to a Lima YAML file in the checkout. Plain mode is enforced.
+    # VM backend, lima or qemu. QEMU boots directly on the runner with UEFI and KVM.
+    # Default: `lima`
+    backend: lima
+
+    # Checkout configuration file. Lima uses YAML in plain mode; QEMU uses the JSON schema described above.
     # This input is required.
     vm-config: ""
 
@@ -103,10 +152,11 @@ application-specific resources such as remote browser devices.
 
 ## Inputs
 
-| **Input**                     | **Description**                                                                                      | **Required** | **Default** |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`vm-config`**               | Path to a Lima YAML file in the checkout. Plain mode is enforced.                                    | **true**     | -           |
-| **`startup-timeout-minutes`** | Guest startup timeout, from 1 to 40 minutes. The subprocess deadline includes one additional minute. | **false**    | `10`        |
+| **Input**                     | **Description**                                                                                       | **Required** | **Default** |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------ | ----------- |
+| **`backend`**                 | VM backend, lima or qemu. QEMU boots directly on the runner with UEFI and KVM.                        | **false**    | `lima`      |
+| **`vm-config`**               | Checkout configuration file. Lima uses YAML in plain mode; QEMU uses the JSON schema described above. | **true**     | -           |
+| **`startup-timeout-minutes`** | Guest startup timeout, from 1 to 40 minutes. The subprocess deadline includes one additional minute.  | **false**    | `10`        |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -115,11 +165,12 @@ application-specific resources such as remote browser devices.
 
 ## Outputs
 
-| **Output** | **Description**                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------ |
-| **`vm`**   | Private Lima runtime directory for subsequent VM actions; allocated before startup.        |
-| **`id`**   | Unique identifier for this invocation.                                                     |
-| **`name`** | Lima instance name for host-side tools. Set LIMA_HOME to the vm output on the same runner. |
+| **Output**       | **Description**                                                                                       |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| **`ssh-config`** | Private SSH configuration for either backend, using the returned name as host alias. Never upload it. |
+| **`vm`**         | Private runtime directory for subsequent VM actions; allocated before startup.                        |
+| **`id`**         | Unique identifier for this invocation.                                                                |
+| **`name`**       | Instance name. Lima tools also need LIMA_HOME set to vm; QEMU tools use ssh-config.                   |
 
 <!-- outputs:end -->
 <!-- examples:start -->

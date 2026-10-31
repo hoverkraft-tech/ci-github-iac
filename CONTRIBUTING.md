@@ -12,7 +12,7 @@ the command before linting.
 `make help` lists commands. `make lint-fix` applies supported automatic fixes;
 `make lint docs/` limits linting to matching paths. Positional filters are accepted
 only for lint commands; unknown standalone targets still fail. `make ci` runs
-`lint-fix` and unit tests locally. VM integration tests run in the hosted action-test workflow.
+`lint-fix` and unit tests locally. VM integration tests run in hosted Lima and direct-QEMU action-test workflows.
 
 Internal `__main-ci.yml` and `__pull-request-ci.yml` call `__shared-ci.yml`.
 Main supports pushes and manual runs; PR CI also supports merge queues. Both
@@ -38,6 +38,10 @@ The four collaboration workflows reuse the pinned ci-github-common workflows.
 Renovate uses the organization's `CI_BOT_APP_CLIENT_ID` Actions variable and
 `CI_BOT_APP_PRIVATE_KEY` Actions secret. Its GitHub App must be installed on this
 repository with the permissions requested by the token-generation step.
+`__test-actions-qemu.yml` covers direct boot, guest and runner report collection,
+failed assertions, startup rollback and repeated cleanup. Keep its Ubuntu image
+URL and checksum aligned with `tests/fixture/lima.yml`.
+
 The Lima version is maintained in `actions/vm/create/action.yml`.
 Keep the token scoped to this repository and the repository configuration in
 `.github/renovate.json`. Dependabot owns Actions and Docker updates; Renovate
@@ -93,13 +97,10 @@ The YAML script only loads that file from `github.action_path` and passes `core`
 Use relative imports inside the entrypoint, so a consumer checkout cannot replace
 the implementation. Each action owns its operation:
 
-| Location                             | Responsibility                                                                    |
-| ------------------------------------ | --------------------------------------------------------------------------------- |
-| `actions/vm/create/creation.cjs`     | Validate configuration, start the guest and roll back failed startup.             |
-| `actions/vm/test/assertions.cjs`     | Execute assertions and write the invocation's status report.                      |
-| `actions/vm/test/reports.cjs`        | Collect selected guest reports.                                                   |
-| `actions/vm/_internal/runtime.cjs`   | Run bounded Lima commands, protect private runtime ownership and verify deletion. |
-| `actions/vm/_internal/workspace.cjs` | Resolve checkout paths without allowing escapes.                                  |
+- `actions/vm/create/` validates configuration, starts guests and rolls back failed startup.
+- `actions/vm/test/` executes tests, collects reports and publishes results.
+- `actions/vm/_internal/` contains bounded backend commands, checkout validation,
+  runtime ownership checks and verified deletion.
 
 Actions share the internal safety primitives; action-specific code stays with its
 owner. Startup rollback and explicit destruction use the same verified cleanup.
@@ -116,3 +117,17 @@ so rendering does not depend on installed fonts. Keep the
 [1280 × 640 PNG export](.github/social-preview.png) aligned with the SVG source.
 The preview embeds the logo geometry to remain self-contained; it is excluded
 from code duplication checks.
+
+## Opinionated VM verification
+
+`vm/test` owns Goss installation, checksum verification, rendering, guest execution
+and native reporting. Keep the release and archive checksum together in
+`actions/vm/test/goss.json`; verify both against the upstream release before updating.
+Its hosted fixtures cover Lima success and QEMU success, failed assertions and
+empty suites. Goss state checks should be read-only.
+
+`ansible/test` owns the pinned Molecule runtime and base sequence. Consumers supply
+Ansible-native scenarios with real convergence and verification playbooks. The
+workflow owns VM creation and destruction. QEMU integration exercises deployment,
+idempotence, reboot and native failure reports. Dependabot updates Molecule's
+requirements; validate the hosted scenarios before accepting an update.

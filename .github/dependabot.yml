@@ -16,7 +16,9 @@ updates:
       docker-dependencies:
         patterns: ["*"]
   - package-ecosystem: pip
-    directory: /tests/fixture/ansible
+    directories:
+      - /tests/fixture/ansible
+      - /actions/ansible/test
     cooldown:
       default-days: 7
     schedule:

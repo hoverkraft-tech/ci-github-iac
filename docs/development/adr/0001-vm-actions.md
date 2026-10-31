@@ -2,7 +2,8 @@
 
 Date: 2026-10-29
 
-Status: Accepted
+Status: Accepted. Backend and test execution contracts extended by
+[ADR 0002](0002-direct-qemu.md).
 
 ## Context
 

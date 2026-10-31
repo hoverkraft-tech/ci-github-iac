@@ -1,0 +1,205 @@
+---
+name: Internal - Test direct QEMU actions
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download verified fixture image
+        run: |
+          mkdir -p .cache/qemu-fixture
+          curl --fail --location --retry 3 https://cloud-images.ubuntu.com/releases/resolute/release-20261016/ubuntu-26.04-server-cloudimg-amd64.img -o .cache/qemu-fixture/image.qcow2
+          echo '5645d0318ad21f643ebb1ac4567514620e9893380b07b0201fda163baa5b7eb5  .cache/qemu-fixture/image.qcow2' | sha256sum --check
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y cloud-image-utils
+      - name: Prepare synthetic cloud-init identity
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: require('./tests/fixture/qemu.cjs')();
+      - name: Create direct QEMU guest
+        id: vm
+        uses: $/actions/vm/create
+        with:
+          backend: qemu
+          vm-config: .cache/qemu-fixture/vm.json
+          startup-timeout-minutes: 5
+      - name: Test guest commands and collection
+        id: guest
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          test-script: tests/fixture/assert.sh
+          report-file: "*.xml,coverage/*.info"
+          report-name: QEMU guest reports
+      - name: Test runner tools and failed assertions
+        id: runner
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          execution: runner
+          command: |
+            test "$(ssh -F "$VM_SSH_CONFIG" "$VM_NAME" uname -s)" = Linux
+            printf '<testsuite tests="1" failures="1"><testcase name="expected-failure"><failure message="Synthetic failure"/></testcase></testsuite>' > "$REPORTS_DIR/native.xml"
+            exit 1
+          report-file: native.xml
+          report-name: QEMU runner reports
+      - name: Verify Goss valid suite
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: goss-valid
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          goss-file: tests/fixture/goss/valid.yaml
+          report-name: Goss - __test-actions-qemu.yml - valid - ${{ strategy.job-index }}
+      - name: Verify Goss invalid suite
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: goss-invalid
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          goss-file: tests/fixture/goss/invalid.yaml
+          report-name: Goss - __test-actions-qemu.yml - invalid - ${{ strategy.job-index }}
+      - name: Verify Goss empty suite
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        id: goss-empty
+        continue-on-error: true
+        uses: $/actions/vm/test
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          goss-file: tests/fixture/goss/empty.yaml
+          report-name: Goss - __test-actions-qemu.yml - empty - ${{ strategy.job-index }}
+      - name: Assert Goss outcomes and failure artifacts
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          VALID: ${{ steps.goss-valid.outcome }}
+          INVALID: ${{ steps.goss-invalid.outcome }}
+          EMPTY: ${{ steps.goss-empty.outcome }}
+          VALID_ARTIFACT: ${{ steps.goss-valid.outputs.artifact-id }}
+          INVALID_ARTIFACT: ${{ steps.goss-invalid.outputs.artifact-id }}
+          EMPTY_ARTIFACT: ${{ steps.goss-empty.outputs.artifact-id }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert.equal(process.env.VALID, 'success');
+            assert.equal(process.env.INVALID, 'failure');
+            assert.equal(process.env.EMPTY, 'failure');
+            for (const key of ['VALID_ARTIFACT', 'INVALID_ARTIFACT', 'EMPTY_ARTIFACT']) assert.ok(process.env[key]);
+      - name: Test Molecule success
+        id: molecule-success
+        continue-on-error: true
+        uses: $/actions/ansible/test
+        env:
+          IAC_FORCE_FAILURE: "false"
+          IAC_FORCE_CHANGE: "false"
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - success
+      - name: Test Molecule assertion-failure
+        id: molecule-assertion-failure
+        continue-on-error: true
+        uses: $/actions/ansible/test
+        env:
+          IAC_FORCE_FAILURE: "true"
+          IAC_FORCE_CHANGE: "false"
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - assertion-failure
+      - name: Test Molecule idempotence-failure
+        id: molecule-idempotence-failure
+        continue-on-error: true
+        uses: $/actions/ansible/test
+        env:
+          IAC_FORCE_FAILURE: "false"
+          IAC_FORCE_CHANGE: "true"
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - idempotence-failure
+      - name: Assert Molecule outcomes and failure reports
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SUCCESS: ${{ steps.molecule-success.outcome }}
+          ASSERTION_FAILURE: ${{ steps.molecule-assertion-failure.outcome }}
+          IDEMPOTENCE_FAILURE: ${{ steps.molecule-idempotence-failure.outcome }}
+          FAILURE_ARTIFACT: ${{ steps.molecule-assertion-failure.outputs.artifact-id }}
+          IDEMPOTENCE_ARTIFACT: ${{ steps.molecule-idempotence-failure.outputs.artifact-id }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert.equal(process.env.SUCCESS, 'success');
+            assert.equal(process.env.ASSERTION_FAILURE, 'failure');
+            assert.equal(process.env.IDEMPOTENCE_FAILURE, 'failure');
+            assert.ok(process.env.FAILURE_ARTIFACT);
+            assert.ok(process.env.IDEMPOTENCE_ARTIFACT);
+      - name: Destroy direct QEMU guest
+        id: destroy
+        if: ${{ always() && steps.vm.outputs.vm != '' }}
+        uses: $/actions/vm/destroy
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+      - name: Verify startup rollback
+        id: invalid
+        continue-on-error: true
+        uses: $/actions/vm/create
+        with:
+          backend: qemu
+          vm-config: .cache/qemu-fixture/invalid.json
+          startup-timeout-minutes: 1
+      - name: Repeat cleanup after rollback
+        id: retry
+        if: ${{ always() && steps.invalid.outputs.vm != '' }}
+        uses: $/actions/vm/destroy
+        with:
+          vm: ${{ steps.invalid.outputs.vm }}
+      - name: Verify failure reports and cleanup
+        if: ${{ always() }}
+        env:
+          VM_DIRECTORY: ${{ steps.vm.outputs.vm }}
+          INVALID_DIRECTORY: ${{ steps.invalid.outputs.vm }}
+          REMOVED: ${{ steps.destroy.outputs.removed }}
+          RETRIED: ${{ steps.retry.outputs.removed }}
+          RUNNER_OUTCOME: ${{ steps.runner.outcome }}
+          INVALID_OUTCOME: ${{ steps.invalid.outcome }}
+          GUEST_ARTIFACT: ${{ steps.guest.outputs.artifact-id }}
+          RUNNER_ARTIFACT: ${{ steps.runner.outputs.artifact-id }}
+          RUNNER_REPORTS: ${{ steps.runner.outputs.report-files }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            const env = process.env;
+            assert.equal(env.REMOVED, 'true');
+            assert.equal(env.RETRIED, 'true');
+            assert.equal(env.RUNNER_OUTCOME, 'failure');
+            assert.equal(env.INVALID_OUTCOME, 'failure');
+            assert.ok(env.GUEST_ARTIFACT);
+            assert.ok(env.RUNNER_ARTIFACT);
+            assert.match(fs.readFileSync(env.RUNNER_REPORTS, 'utf8'), /Synthetic failure/);
+            for (const directory of [env.VM_DIRECTORY, env.INVALID_DIRECTORY]) {
+              assert.ok(directory);
+              assert.equal(fs.existsSync(directory), false);
+            }
+      - name: Remove private fixture inputs
+        if: ${{ always() }}
+        run: rm -rf .cache/qemu-fixture
