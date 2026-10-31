@@ -82,7 +82,14 @@ class GossSuite {
 
 	validateReports(files) {
 		const report = files.find((file) => path.basename(file) === "goss.xml");
-		if (!report || !/<testcase[\s>]/.test(fs.readFileSync(report, "utf8")))
+		const xml = report ? fs.readFileSync(report, "utf8") : "";
+		const total = Number(
+			xml.match(/<testsuite\b[^>]*\btests="([0-9]+)"/)?.[1] || 0,
+		);
+		const skipped = Number(
+			xml.match(/<testsuite\b[^>]*\bskipped="([0-9]+)"/)?.[1] || 0,
+		);
+		if (total <= skipped || !/<testcase[\s>]/.test(xml))
 			throw new Error("Goss must execute at least one assertion");
 	}
 }

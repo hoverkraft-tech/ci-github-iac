@@ -71,6 +71,11 @@ test("Goss rejects empty native reports while retaining failed assertion reports
 	assert.throws(() => suite.validateReports([file]), /at least one/);
 	fs.writeFileSync(
 		file,
+		'<testsuite tests="1" skipped="1"><testcase name="skipped"><skipped/></testcase></testsuite>',
+	);
+	assert.throws(() => suite.validateReports([file]), /at least one/);
+	fs.writeFileSync(
+		file,
 		'<testsuite tests="1" failures="1"><testcase name="service"><failure/></testcase></testsuite>',
 	);
 	assert.doesNotThrow(() => suite.validateReports([file]));
@@ -80,7 +85,7 @@ test("Molecule derives inventory only from a running owned VM", (t) => {
 	const directory = fixture(t);
 	const vm = VirtualMachine.allocate();
 	t.after(() => fs.rmSync(vm.home, { recursive: true, force: true }));
-	fs.writeFileSync(vm.sshConfig, "Host iac-test\n");
+	fs.writeFileSync(vm.sshConfig, "Host iac-test\n  User root\n");
 	t.mock.method(VirtualMachine.prototype, "exists", () => true);
 	const env = { ANSIBLE_VM: vm.home, MOLECULE_INVENTORY_GROUP: "proxmox" };
 	new MoleculeScenario(env).prepare(directory, "/checkout/molecule/default");
@@ -88,6 +93,7 @@ test("Molecule derives inventory only from a running owned VM", (t) => {
 		fs.readFileSync(path.join(directory, "inventory.json")),
 	);
 	assert.deepEqual(Object.keys(inventory.proxmox.hosts), ["iac-test"]);
+	assert.equal(inventory.proxmox.hosts["iac-test"].ansible_user, "root");
 	assert.equal(
 		inventory.proxmox.hosts["iac-test"].ansible_ssh_common_args,
 		`-F ${vm.sshConfig}`,

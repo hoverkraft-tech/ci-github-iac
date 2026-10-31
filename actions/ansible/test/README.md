@@ -27,7 +27,8 @@ and verify contains explicit assertions. The action installs pinned Molecule,
 generates an inventory containing only the disposable VM, and supplies a base
 sequence: prepare, converge, verify, idempotence, side_effect, verify.
 Default prepare waits for SSH; default side_effect reboots and verifies a new
-boot identity. Scenarios can override playbooks and sequence using Molecule's
+boot identity; the test identity needs root or passwordless sudo in the guest.
+Scenarios can override playbooks and sequence using Molecule's
 documented configuration. Do not add VM create/destroy or lint steps: the
 workflow owns lifecycle and must always call vm/destroy, including after failure.
 Set inventory-group when the deployment playbook targets a named inventory group.

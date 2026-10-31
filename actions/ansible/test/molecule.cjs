@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const childProcess = require("node:child_process");
-const { VirtualMachine } = require("../../vm/_internal/runtime.cjs");
+const { VirtualMachine, run } = require("../../vm/_internal/runtime.cjs");
 
 class MoleculeScenario {
 	constructor(env) {
@@ -29,6 +29,10 @@ class MoleculeScenario {
 		const minutes = this.env.ANSIBLE_TEST_TIMEOUT_MINUTES || "20";
 		if (!/^[1-9][0-9]?$/.test(minutes) || Number(minutes) > 40)
 			throw new Error("Test timeout must be 1 to 40 minutes");
+		const config = run("ssh", ["-G", "-F", vm.sshConfig, vm.name]);
+		const user = config.match(/^user ([a-zA-Z0-9_.-]+)$/m)?.[1];
+		if (!user)
+			throw new Error("The VM SSH configuration must resolve a login user");
 		fs.writeFileSync(
 			path.join(directory, "inventory.json"),
 			JSON.stringify({
@@ -36,6 +40,7 @@ class MoleculeScenario {
 					hosts: {
 						[vm.name]: {
 							ansible_connection: "ssh",
+							ansible_user: user,
 							ansible_ssh_common_args: `-F ${vm.sshConfig}`,
 						},
 					},
@@ -69,6 +74,8 @@ class MoleculeScenario {
 				"--base-config",
 				path.join(__dirname, "molecule.yml"),
 				"test",
+				"--destroy",
+				"never",
 				"--scenario-name",
 				path.basename(scenario),
 			],

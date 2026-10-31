@@ -17,7 +17,7 @@ module.exports = () => {
 	const key = fs.readFileSync(`${directory}/key.pub`, "utf8").trim();
 	fs.writeFileSync(
 		`${directory}/user-data`,
-		`#cloud-config\nusers:\n  - name: tester\n    shell: /bin/bash\n    ssh_authorized_keys:\n      - ${key}\n`,
+		`#cloud-config\nusers:\n  - name: tester\n    shell: /bin/bash\n    sudo: ALL=(ALL) NOPASSWD:ALL\n    ssh_authorized_keys:\n      - ${key}\n`,
 	);
 	fs.writeFileSync(
 		`${directory}/meta-data`,
