@@ -1,0 +1,13 @@
+gossfile:
+  included.yaml: {}
+command:
+  provisioned-group:
+    exec: id -nG
+    exit-status: 0
+    stdout:
+      - /\biac-goss\b/
+  kernel:
+    exec: uname -s
+    exit-status: 0
+    stdout:
+      - "{{ .Vars.kernel }}"

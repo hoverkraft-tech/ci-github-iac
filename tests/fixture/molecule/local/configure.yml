@@ -1,0 +1,10 @@
+---
+- name: Configure the local test resource
+  hosts: fixture
+  gather_facts: false
+  tasks:
+    - name: Write the expected configuration
+      ansible.builtin.copy:
+        dest: "{{ fixture_directory }}/configuration"
+        content: "scenario-owned configuration\n"
+        mode: "0600"

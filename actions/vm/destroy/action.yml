@@ -3,7 +3,8 @@
 # ### Schedule cleanup
 #
 # Pass the original `vm` output from [vm/create](../create/README.md) on the same
-# runner. Run this step after all [vm/test](../test/README.md) calls and reporting:
+# runner. Cleanup selects the matching backend automatically. Run this step after
+# all VM and Ansible tests and reporting, including if an earlier step failed:
 #
 # ```yaml
 # - name: Destroy VM
@@ -20,9 +21,9 @@
 # ### Verification and recovery
 #
 # Destruction accepts only an owned private runtime created by `vm/create`. It
-# verifies guest absence before deleting the runtime and SSH keys. `removed` is
-# true only after verified cleanup. Lima deletion and verification commands have
-# two-minute deadlines and a 1 MiB output limit per stream.
+# verifies guest absence before deleting the runtime and SSH keys.
+# Backend operations have bounded deadlines;
+# destruction fails if it cannot verify removal of the owned VM.
 #
 # Failed cleanup fails the step and retains the runtime for recovery. Retry with
 # another `vm/destroy` step using `if: always()` and the original `vm` output on
@@ -34,19 +35,15 @@
 # and cloud resource cleanup are outside scope.
 ---
 name: VM - Destroy
-description: Delete an owned Lima VM, verify deletion and remove its runtime directory.
+description: Delete an owned VM, verify deletion and remove its runtime directory.
 author: Hoverkraft
 branding:
   icon: trash-2
   color: purple
 inputs:
   vm:
-    description: Private runtime directory returned by vm/create; repeated deletion is safe.
+    description: VM reference returned by vm/create in the same job; works with either creation backend. Repeated deletion is safe.
     required: true
-outputs:
-  removed:
-    description: True only after verified deletion of the guest and its runtime.
-    value: ${{ steps.destroy.outputs.removed }}
 runs:
   using: composite
   steps:
@@ -54,7 +51,16 @@ runs:
       id: destroy
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
-        VM_ACTION_PATH: ${{ github.action_path }}
+        ACTION_PATH: ${{ github.action_path }}
         VM_DIRECTORY: ${{ inputs.vm }}
       with:
-        script: require(`${process.env.VM_ACTION_PATH}/index.cjs`)({ core });
+        script: |
+          const { VirtualMachine } = require(`${process.env.ACTION_PATH}/../_internal/runtime.cjs`);
+
+          try {
+            await new VirtualMachine(process.env.VM_DIRECTORY, { exec, io }).destroy();
+          } catch {
+            core.setFailed(
+              "VM destruction failed. The runtime directory is retained for recovery.",
+            );
+          }

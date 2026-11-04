@@ -1,0 +1,5 @@
+command:
+  bounded-probe:
+    exec: sleep 120
+    timeout: 180000
+    exit-status: 0

@@ -1,3 +1,5 @@
+const fs = require("node:fs");
+const { run } = require("../_internal/command.cjs");
 const { Workspace } = require("../_internal/workspace.cjs");
 
 class GuestCreation {
@@ -13,10 +15,18 @@ class GuestCreation {
 		this.startupTimeout = Number(minutes);
 	}
 
-	start(vm) {
-		if (vm.exists()) throw new Error("This invocation already has a VM");
+	async start(vm) {
+		if (await vm.exists()) throw new Error("This invocation already has a VM");
+		const command = (args, options) => {
+			vm.validateRuntime();
+			if (!fs.existsSync(vm.home)) throw new Error("VM runtime is absent");
+			return run(vm.exec, "limactl", args, {
+				...options,
+				env: { ...process.env, LIMA_HOME: vm.home },
+			});
+		};
 		try {
-			vm.command(
+			await command(
 				[
 					"start",
 					"--tty=false",
@@ -27,8 +37,14 @@ class GuestCreation {
 				],
 				{ timeout: (this.startupTimeout + 1) * 60000 },
 			);
+			const config = await command(["show-ssh", "--format=config", vm.name]);
+			fs.writeFileSync(
+				vm.sshConfig,
+				config.replace(/^Host\s+.*$/m, `Host ${vm.name}`),
+				{ mode: 0o600, flag: "wx" },
+			);
 		} catch (error) {
-			vm.destroy();
+			await vm.destroy();
 			throw error;
 		}
 	}

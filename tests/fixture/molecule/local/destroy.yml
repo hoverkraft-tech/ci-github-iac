@@ -1,0 +1,9 @@
+---
+- name: Destroy the local test resource
+  hosts: fixture
+  gather_facts: false
+  tasks:
+    - name: Remove the isolated directory
+      ansible.builtin.file:
+        path: "{{ fixture_directory }}"
+        state: absent

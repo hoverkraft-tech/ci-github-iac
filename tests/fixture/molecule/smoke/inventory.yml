@@ -1,0 +1,8 @@
+---
+vm:
+  hosts:
+    smoke:
+      ansible_connection: ssh
+      ansible_host: "{{ lookup('ansible.builtin.env', 'VM_NAME', default=undef()) }}"
+      ansible_user: tester
+      ansible_ssh_common_args: "-F {{ lookup('ansible.builtin.env', 'VM_SSH_CONFIG', default=undef()) }}"

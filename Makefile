@@ -9,7 +9,11 @@ help: ## Display help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 test: ## Run unit tests
-	node --test tests/*.test.cjs
+	@set -eu; \
+	for manifest in $(wildcard actions/*/*/package.json); do \
+		npm --prefix "$${manifest%/package.json}" ci --ignore-scripts --no-audit --no-fund; \
+		npm --prefix "$${manifest%/package.json}" test; \
+	done
 
 lint: ## Execute linting
 	$(call run_linter,)
@@ -30,8 +34,16 @@ ci: ## Execute local CI tasks
 	$(MAKE) lint-fix
 	$(MAKE) test
 
-docs: ## Generate action documentation
-	npm exec --yes --package=@ci-dokumentor/cli@0.5.0 -- ci-dokumentor generate --source actions/ansible/test/action.yml actions/vm/create/action.yml actions/vm/test/action.yml actions/vm/destroy/action.yml --repository git
+docs: ## Generate action and public workflow documentation
+	@set -eu; \
+	GITHUB_TOKEN="$$(gh auth token)"; \
+	export GITHUB_TOKEN; \
+	docker run --rm \
+		-v "$(CURDIR):/workspace" \
+		-u "$(HOST_UID):$(HOST_GID)" \
+		-e GITHUB_TOKEN \
+		ghcr.io/hoverkraft-tech/ci-dokumentor/cli:0.5.0 \
+		generate --source "actions/**/action.{yml,yaml}" ".github/workflows/!(__*).{yml,yaml}"
 
 #############################
 # Helpers

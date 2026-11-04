@@ -1,0 +1,23 @@
+---
+ansible:
+  executor:
+    args:
+      ansible_playbook:
+        - --inventory=${MOLECULE_SCENARIO_DIRECTORY}/inventory.yml
+  playbooks:
+    prepare: ready.yml
+    converge: converge.yml
+    verify: verify.yml
+    side_effect: reboot.yml
+scenario:
+  test_sequence:
+    - prepare
+    - converge
+    - verify
+    - idempotence
+    - side_effect
+    - verify
+    - idempotence
+shared_state: false
+verifier:
+  name: ansible

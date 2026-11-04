@@ -1,8 +1,9 @@
 ---
 - name: Exercise a synthetic Ansible test assertion
-  hosts: localhost
-  connection: local
+  hosts: fixture
   gather_facts: false
+  roles:
+    - example.smoke.smoke
   tasks:
     - name: Assert the selected fixture succeeds
       ansible.builtin.assert:

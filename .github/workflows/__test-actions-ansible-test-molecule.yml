@@ -1,0 +1,198 @@
+---
+name: Internal - Test ansible/test-molecule
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  unit-tests:
+    # Standard runner and checkout setup; each action owns its test command below.
+    # jscpd:ignore-start
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Arrange - Checkout action sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # jscpd:ignore-end
+      - name: Act - Run ansible/test-molecule unit tests
+        uses: hoverkraft-tech/ci-github-nodejs/actions/test@97f64bc080b78daca8fb3ece49de448aaac83429 # 1.1.0
+        with:
+          working-directory: actions/ansible/test-molecule
+          command: test:ci
+          coverage: ""
+  local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        result: [success, failure, timeout]
+    env:
+      MOLECULE_TEST_RESULT: ${{ matrix.result }}
+    steps:
+      - name: Arrange - Checkout native scenario
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Act - Test a scenario without a VM
+        id: scenario
+        continue-on-error: true
+        uses: $/actions/ansible/test-molecule
+        env:
+          MOLECULE_TEST_DIRECTORY: ${{ runner.temp }}/molecule-local
+        with:
+          molecule-scenario: tests/fixture/molecule/local
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          test-timeout-minutes: ${{ matrix.result == 'timeout' && '1' || '5' }}
+          report-name: Molecule local scenario - ${{ matrix.result }}
+      - name: Assert - Require native reports and scenario cleanup
+        if: ${{ always() }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MOLECULE_TEST_DIRECTORY: ${{ runner.temp }}/molecule-local
+          SCENARIO_OUTCOME: ${{ steps.scenario.outcome }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const assert = require('node:assert/strict');
+            const { PublishedReports } = require('./tests/helpers/published-reports.cjs');
+            const published = new PublishedReports(github, context);
+            const expected = process.env.MOLECULE_TEST_RESULT === 'success' ? 'success' : 'failure';
+            assert.equal(process.env.SCENARIO_OUTCOME, expected);
+            assert.equal(fs.existsSync(process.env.MOLECULE_TEST_DIRECTORY), false);
+            const [report] = await published.read('molecule-reports-', 1);
+            assert.ok(report.files.some(file => file.endsWith('/scenario.xml')));
+            assert.equal(/<(?:failure|error)\b/.test(report.text), expected === 'failure');
+  vm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Keep fixture setup visible in each action's dedicated workflow.
+    # jscpd:ignore-start
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Arrange - Checkout fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Arrange - Prepare QEMU inputs
+        id: fixture
+        uses: $/tests/fixture/prepare-vm
+        with:
+          backend: qemu
+      - name: Arrange - Create direct QEMU guest
+        id: vm
+        uses: $/actions/vm/create
+        with:
+          backend: qemu
+          vm-config: ${{ steps.fixture.outputs.vm-config }}
+          startup-timeout-minutes: 5
+      # jscpd:ignore-end
+      - name: Arrange - Expose the fixture VM to native scenario inventories
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          FIXTURE_VM_NAME: ${{ steps.vm.outputs.name }}
+          FIXTURE_VM_SSH_CONFIG: ${{ steps.vm.outputs.ssh-config }}
+        with:
+          script: |
+            core.exportVariable('VM_NAME', process.env.FIXTURE_VM_NAME);
+            core.exportVariable('VM_SSH_CONFIG', process.env.FIXTURE_VM_SSH_CONFIG);
+      - name: Act - Test Molecule success
+        id: molecule-success
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        continue-on-error: true
+        uses: $/actions/ansible/test-molecule
+        env:
+          IAC_FORCE_FAILURE: "false"
+          IAC_FORCE_CHANGE: "false"
+        with:
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - success
+
+      - name: Assert - Check successful Molecule execution
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SUCCESS: ${{ steps.molecule-success.outcome }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { PublishedReports } = require('./tests/helpers/published-reports.cjs');
+            const published = new PublishedReports(github, context);
+            assert.equal(process.env.SUCCESS, 'success');
+            await published.read('molecule-reports-', 1);
+
+      - name: Act - Test Molecule assertion-failure
+        id: molecule-assertion-failure
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        continue-on-error: true
+        uses: $/actions/ansible/test-molecule
+        env:
+          IAC_FORCE_FAILURE: "true"
+          IAC_FORCE_CHANGE: "false"
+        with:
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - assertion-failure
+
+      - name: Assert - Check Molecule assertion failure and reports
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ASSERTION_FAILURE: ${{ steps.molecule-assertion-failure.outcome }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { PublishedReports } = require('./tests/helpers/published-reports.cjs');
+            const published = new PublishedReports(github, context);
+            assert.equal(process.env.ASSERTION_FAILURE, 'failure');
+            await published.read('molecule-reports-', 2);
+
+      - name: Act - Test Molecule idempotence-failure
+        id: molecule-idempotence-failure
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        continue-on-error: true
+        uses: $/actions/ansible/test-molecule
+        env:
+          IAC_FORCE_FAILURE: "false"
+          IAC_FORCE_CHANGE: "true"
+        with:
+          molecule-scenario: tests/fixture/molecule/smoke
+          ansible-requirements: tests/fixture/ansible/requirements.txt
+          report-name: Molecule - idempotence-failure
+
+      - name: Assert - Check Molecule idempotence failure and reports
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          IDEMPOTENCE_FAILURE: ${{ steps.molecule-idempotence-failure.outcome }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { PublishedReports } = require('./tests/helpers/published-reports.cjs');
+            const published = new PublishedReports(github, context);
+            assert.equal(process.env.IDEMPOTENCE_FAILURE, 'failure');
+            await published.read('molecule-reports-', 3);
+
+      # Fixture teardown is intentionally repeated; action assertions remain above.
+      # jscpd:ignore-start
+      - name: Cleanup - Destroy direct QEMU guest
+        id: destroy
+        if: ${{ always() && steps.vm.outputs.vm != '' }}
+        uses: $/actions/vm/destroy
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+      - name: Cleanup - Remove private fixture inputs
+        if: ${{ always() }}
+        run: rm -rf .cache/qemu-fixture
+      # jscpd:ignore-end

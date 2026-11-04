@@ -1,0 +1,21 @@
+---
+ansible:
+  executor:
+    args:
+      ansible_playbook:
+        - --inventory=${MOLECULE_SCENARIO_DIRECTORY}/inventory.yml
+  playbooks:
+    create: create.yml
+    converge: configure.yml
+    verify: assertions.yml
+    destroy: destroy.yml
+scenario:
+  test_sequence:
+    - create
+    - converge
+    - verify
+    - idempotence
+    - destroy
+shared_state: false
+verifier:
+  name: ansible

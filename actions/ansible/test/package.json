@@ -1,0 +1,18 @@
+{
+	"name": "ansible-test-tests",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Unit tests for the ansible/test action",
+	"license": "MIT",
+	"engines": {
+		"node": ">=24.8.0"
+	},
+	"scripts": {
+		"test": "node --test",
+		"pretest:ci": "node -e \"require('node:fs').mkdirSync('coverage', { recursive: true })\"",
+		"test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test"
+	},
+	"devDependencies": {
+		"@actions/glob": "0.4.0"
+	}
+}

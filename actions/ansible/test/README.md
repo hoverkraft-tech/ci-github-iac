@@ -2,12 +2,20 @@
 
 # ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItY2hlY2stY2lyY2xlIiBjb2xvcj0icHVycGxlIj48cGF0aCBkPSJNMjIgMTEuMDhWMTJhMTAgMTAgMCAxIDEtNS45My05LjE0Ij48L3BhdGg+PHBvbHlsaW5lIHBvaW50cz0iMjIgNCAxMiAxNC4wMSA5IDExLjAxIj48L3BvbHlsaW5lPjwvc3ZnPg==) GitHub Action: Ansible - Test
 
+<div align="center">
+  <img src="../../../.github/logo.svg" width="60px" align="center" alt="Ansible - Test" />
+</div>
+
+---
+
 <!-- header:end -->
 <!-- badges:start -->
 
 [![Marketplace](https://img.shields.io/badge/Marketplace-ansible------test-blue?logo=github-actions)](https://github.com/marketplace/actions/ansible---test)
 [![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-iac)](https://github.com/hoverkraft-tech/ci-github-iac/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-iac)](http://choosealicense.com/licenses/mit/)
 [![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md)
 
 <!-- badges:end -->
 <!-- overview:start -->
@@ -17,6 +25,10 @@
 Run Ansible test playbooks and collection sanity with native reports, PR comments and artifacts.
 
 Run Ansible tests with maintained upstream actions and native JUnit reports.
+
+For Ansible integration scenarios with a configurable target environment, use
+[ansible/test-molecule](../test-molecule/README.md). This action tests Ansible content
+without managing a VM or running a deployment lifecycle.
 
 ### Run tests
 
@@ -31,8 +43,8 @@ The pinned Ansible Core is installed in a temporary virtual environment using
 the runner's Python; that Python must be supported by the selected Ansible Core.
 Ansible's built-in JUnit callback writes task results, including failed assertions.
 Provide test assertions and disposable targets, never a deployment playbook.
-`inventory`, `ansible-config`, `collections-path` and `galaxy-requirements`
-configure test execution. The action does not provision test environments.
+Use `ansible-config` for inventory and collection search paths, and
+`galaxy-requirements` for dependencies. The action does not provision test environments.
 
 Collection sanity uses the maintained Ansible community
 [ansible-test action](https://github.com/ansible-community/ansible-test-gh-action),
@@ -58,7 +70,7 @@ Report collection runs after upstream failures, including when the upstream
 action does not export its report output. Reports are uploaded with a unique
 artifact name and seven-day retention, including after parsing or commenting
 errors. Missing reports fail the action. Failed tests remain failures. No custom
-test runner, Docker lifecycle or JUnit generator is maintained here.
+test runner or Docker lifecycle is maintained here.
 
 Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
 Never run untrusted tests through `pull_request_target`. Use distinct report names
@@ -75,36 +87,38 @@ for matrix entries.
 | **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively. | **false**    | -                      |
 | **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                 | **false**    | -                      |
 | **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                      | **false**    | -                      |
-| **`inventory`**             | Optional checkout-relative inventory file for test playbook execution.                                                             | **false**    | -                      |
 | **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                           | **false**    | -                      |
-| **`collections-path`**      | Optional checkout-relative first-party collection search directory containing ansible_collections.                                 | **false**    | -                      |
 | **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                              | **false**    | -                      |
 | **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                  | **false**    | `Ansible test results` |
-| **`github-token`**          | Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.                                     | **false**    | `${{ github.token }}`  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
 <!-- secrets:end -->
 <!-- outputs:start -->
-
-## Outputs
-
-| **Output**         | **Description**                                                                              |
-| ------------------ | -------------------------------------------------------------------------------------------- |
-| **`report-files`** | Newline-separated absolute paths of completed native reports, including after check failure. |
-| **`summary`**      | Parsed validation summary.                                                                   |
-| **`markdown`**     | Markdown used for the PR comment.                                                            |
-| **`parsed-files`** | JSON array of parsed report paths.                                                           |
-| **`artifact-id`**  | Uploaded report artifact identifier.                                                         |
-
 <!-- outputs:end -->
 <!-- examples:start -->
 <!-- examples:end -->
 <!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md) for more details.
+
 <!-- contributing:end -->
 <!-- security:start -->
 <!-- security:end -->
 <!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2026 Hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
 <!-- license:end -->
 <!-- generated:start -->
 
@@ -133,14 +147,8 @@ This documentation was automatically generated by [CI Dokumentor](https://github
     # Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.
     target-python-version: ""
 
-    # Optional checkout-relative inventory file for test playbook execution.
-    inventory: ""
-
     # Optional checkout-relative ansible.cfg file for test playbook execution.
     ansible-config: ""
-
-    # Optional checkout-relative first-party collection search directory containing ansible_collections.
-    collections-path: ""
 
     # Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.
     galaxy-requirements: ""
@@ -148,10 +156,6 @@ This documentation was automatically generated by [CI Dokumentor](https://github
     # Stable summary and PR comment title, distinct for each test step or matrix entry.
     # Default: `Ansible test results`
     report-name: Ansible test results
-
-    # Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.
-    # Default: `${{ github.token }}`
-    github-token: ${{ github.token }}
 ```
 
 <!-- usage:end -->
