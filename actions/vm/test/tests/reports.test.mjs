@@ -1,11 +1,11 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const { suite, test } = require("node:test");
-const { GuestReports } = require("../reports.cjs");
-const { GuestAssertions } = require("../assertions.cjs");
-const exec = require("@actions/exec");
-const io = require("@actions/io");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { suite, test } from "node:test";
+import { GuestReports } from "../reports.cjs";
+import { GuestAssertions } from "../assertions.cjs";
+import * as exec from "@actions/exec";
+import * as io from "@actions/io";
 
 async function fixture(t) {
 	const directory = fs.mkdtempSync("/tmp/report-test-");

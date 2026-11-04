@@ -1,12 +1,15 @@
-const { suite, test } = require("node:test");
-const { MoleculeInputs } = require("../inputs.cjs");
-const { MoleculeScenario } = require("../molecule.cjs");
-const fs = require("node:fs");
-const path = require("node:path");
-const assert = require("node:assert/strict");
-const os = require("node:os");
-const exec = require("@actions/exec");
-const glob = require("@actions/glob");
+import { suite, test } from "node:test";
+import { MoleculeInputs } from "../inputs.cjs";
+import { MoleculeScenario } from "../molecule.cjs";
+import fs from "node:fs";
+import path from "node:path";
+import assert from "node:assert/strict";
+import os from "node:os";
+import * as execToolkit from "@actions/exec";
+import * as glob from "@actions/glob";
+
+// Copy the ESM namespace so tests can mock the injected helper.
+const exec = { ...execToolkit };
 
 function fixture(t) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "molecule-contract-"));

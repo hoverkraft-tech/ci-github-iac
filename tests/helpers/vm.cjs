@@ -3,14 +3,8 @@ const os = require("node:os");
 const path = require("node:path");
 const { VirtualMachine } = require("../../actions/vm/_internal/runtime.cjs");
 const { QemuCreation } = require("../../actions/vm/create/qemu.cjs");
-const { createRequire } = require("node:module");
-const actionRequire = createRequire(path.resolve("package.json"));
-const helpers = {
-	exec: actionRequire("@actions/exec"),
-	io: actionRequire("@actions/io"),
-};
 
-function limaFixture(t, Machine = VirtualMachine) {
+function limaFixture(t, helpers, Machine = VirtualMachine) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "vm-test-"));
 	const previousDirectory = process.cwd();
 	process.chdir(root);
@@ -28,7 +22,7 @@ function limaFixture(t, Machine = VirtualMachine) {
 	return { root, vm, reports: path.join(root, ".reports") };
 }
 
-function qemuFixture(t, Machine = VirtualMachine) {
+function qemuFixture(t, helpers, Machine = VirtualMachine) {
 	const root = fs.mkdtempSync("/tmp/qemu-test-");
 	const previous = process.cwd();
 	process.chdir(root);

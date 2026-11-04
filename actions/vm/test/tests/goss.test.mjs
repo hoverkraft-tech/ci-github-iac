@@ -1,17 +1,22 @@
-const exec = require("@actions/exec");
-const io = require("@actions/io");
+import * as execToolkit from "@actions/exec";
+import * as io from "@actions/io";
+import { suite, test } from "node:test";
+import { GossSuite } from "../goss.cjs";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+// Copy the ESM namespace so tests can mock the injected helper.
+const exec = { ...execToolkit };
 const helpers = { exec, io };
-const { suite, test } = require("node:test");
-const { GossSuite } = require("../goss.cjs");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
 
 function fixture(t) {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "goss-test-"));
 	const previousDirectory = process.cwd();
-	process.chdir(path.join(__dirname, "../../../../tests/fixture/goss"));
+	process.chdir(
+		path.join(import.meta.dirname, "../../../../tests/fixture/goss"),
+	);
 	t.after(() => {
 		process.chdir(previousDirectory);
 		fs.rmSync(directory, { recursive: true, force: true });

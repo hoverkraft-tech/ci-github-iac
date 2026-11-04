@@ -1,14 +1,15 @@
-const exec = require("@actions/exec");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const { suite, test } = require("node:test");
-const { GuestAssertions } = require("../assertions.cjs");
-const { Guest } = require("../guest.cjs");
-const {
-	limaFixture,
-	qemuFixture,
-} = require("../../../../tests/helpers/vm.cjs");
+import * as io from "@actions/io";
+import * as execToolkit from "@actions/exec";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { suite, test } from "node:test";
+import { GuestAssertions } from "../assertions.cjs";
+import { Guest } from "../guest.cjs";
+import { limaFixture, qemuFixture } from "../../../../tests/helpers/vm.cjs";
+
+// Copy the ESM namespace so tests can mock the injected helper.
+const exec = { ...execToolkit };
 
 suite("vm/test - execution", () => {
 	for (const [backend, fixture] of [
@@ -17,7 +18,7 @@ suite("vm/test - execution", () => {
 	]) {
 		test(`${backend} guest transport opens fresh logins and preserves quoted arguments, stdin and deadlines`, async (t) => {
 			// Arrange
-			const { vm } = fixture(t, Guest);
+			const { vm } = fixture(t, { exec, io }, Guest);
 			t.mock.method(vm, "exists", () => true);
 			const spawn = t.mock.method(exec, "exec", (_program, _args, options) => {
 				options.listeners.stdout(Buffer.from("result\n"));
@@ -69,7 +70,7 @@ suite("vm/test - execution", () => {
 	]) {
 		test(`${backend} guest uploads reject paths outside private test files`, async (t) => {
 			// Arrange
-			const { vm } = fixture(t, Guest);
+			const { vm } = fixture(t, { exec, io }, Guest);
 			t.mock.method(vm, "exists", () => true);
 			const spawn = t.mock.method(exec, "exec");
 			for (const destination of [
@@ -89,7 +90,7 @@ suite("vm/test - execution", () => {
 
 	test("reports require a resolved directory and a bounded deadline", async (t) => {
 		// Arrange
-		const { reports } = limaFixture(t, Guest);
+		const { reports } = limaFixture(t, { exec, io }, Guest);
 		for (const directory of [undefined, "", ".reports"]) {
 			// Act
 			const configure = () =>
@@ -110,8 +111,8 @@ suite("vm/test - execution", () => {
 
 	test("invalid suites fail before any guest work", (t) => {
 		// Arrange
-		const { root, reports } = limaFixture(t, Guest);
-		fs.symlinkSync(__filename, path.join(root, "external.yaml"));
+		const { root, reports } = limaFixture(t, { exec, io }, Guest);
+		fs.symlinkSync(import.meta.filename, path.join(root, "external.yaml"));
 		for (const goss of [
 			undefined,
 			"",
