@@ -2,7 +2,9 @@
 
 Date: 2026-10-29
 
-Status: Accepted
+Status: Accepted. Backend and test execution contracts are extended, and mandatory
+external entrypoints are superseded, by
+[ADR 0002](0002-infrastructure-test-actions.md).
 
 ## Context
 

@@ -2,41 +2,39 @@
 
 # ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItc2VydmVyIiBjb2xvcj0icHVycGxlIj48cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMjAiIGhlaWdodD0iOCIgcng9IjIiIHJ5PSIyIj48L3JlY3Q+PHJlY3QgeD0iMiIgeT0iMTQiIHdpZHRoPSIyMCIgaGVpZ2h0PSI4IiByeD0iMiIgcnk9IjIiPjwvcmVjdD48bGluZSB4MT0iNiIgeTE9IjYiIHgyPSI2LjAxIiB5Mj0iNiI+PC9saW5lPjxsaW5lIHgxPSI2IiB5MT0iMTgiIHgyPSI2LjAxIiB5Mj0iMTgiPjwvbGluZT48L3N2Zz4=) GitHub Action: VM - Create
 
+<div align="center">
+  <img src="../../../.github/logo.svg" width="60px" align="center" alt="VM - Create" />
+</div>
+
+---
+
 <!-- header:end -->
 <!-- badges:start -->
 
 [![Marketplace](https://img.shields.io/badge/Marketplace-vm------create-blue?logo=github-actions)](https://github.com/marketplace/actions/vm---create)
 [![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-iac)](https://github.com/hoverkraft-tech/ci-github-iac/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-iac)](http://choosealicense.com/licenses/mit/)
 [![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md)
 
 <!-- badges:end -->
 <!-- overview:start -->
 
 ## Overview
 
-Create an isolated Lima VM, rolling back resources if startup fails.
+Create an isolated disposable VM, rolling back resources if startup fails.
 
-Create a disposable Lima guest and return its private runtime directory.
-
-### Runner and configuration
-
-Use an ephemeral Linux x86-64 runner with KVM, network access and `contents: read`.
-Check out the consumer repository with `persist-credentials: false`. Reserve a
-90-minute job timeout for installation, startup, testing and cleanup. Pin all
-three VM actions to the same reviewed full commit SHA.
-
-`vm-config` must point to an existing Lima YAML file within the checkout. Missing
-or blank input fails before allocating a runtime. The consumer owns the image
-and resource settings; no default configuration is supplied. The
-[test fixture](../../../tests/fixture/lima.yml) provides a digest-pinned Ubuntu
-example. Plain mode is enforced: host mounts, SSH agent forwarding and dynamic
-port forwarding are disabled. Provisioning still runs, so treat configuration
-and scripts as trusted repository code.
+Create a disposable VM and return the reference used by testing and cleanup.
 
 ### Compose the VM actions
 
-After checkout, create the guest, [run tests](../test/README.md) and
-[destroy the guest](../destroy/README.md) in the same job:
+Create the VM, [run tests](../test/README.md) and
+[destroy it](../destroy/README.md) in the same job. Pass the same `vm` output to
+testing and cleanup. Choose the backend only when creating the VM; both later
+actions use that reference to select the matching implementation automatically.
+
+After checkout, supply your VM configuration and a
+[Goss suite](../../../tests/fixture/goss/valid.yaml):
 
 ```yaml
 - name: Create VM
@@ -48,7 +46,7 @@ After checkout, create the guest, [run tests](../test/README.md) and
   uses: hoverkraft-tech/ci-github-iac/actions/vm/test@<same-reviewed-full-commit-sha>
   with:
     vm: ${{ steps.vm.outputs.vm }}
-    command: test -d /run/systemd/system
+    goss-file: tests/goss.yaml
     report-name: Infrastructure VM tests
 - name: Destroy VM
   if: ${{ always() && steps.vm.outputs.vm != '' }}
@@ -57,29 +55,116 @@ After checkout, create the guest, [run tests](../test/README.md) and
     vm: ${{ steps.vm.outputs.vm }}
 ```
 
+Testing leaves the VM running. Add further `vm/test` steps or an
+[Ansible Molecule scenario](../../ansible/test-molecule/README.md) before destruction to
+check deployment, idempotence and reboot against the same VM.
+Reference the creation step's `name` and `ssh-config` outputs in that scenario's
+inventory; Molecule's target and sequence are configured by the scenario.
+
 Default GitHub reporting needs `pull-requests: write` for PR comments. Other
 reporting modes and permissions are documented by `vm/test`. The maintained
-[action-test workflow](../../../.github/workflows/__test-actions-vm.yml) also
+[VM test workflow](../../../.github/workflows/__test-actions-vm-test.yml) also
 covers failures and repeated tests. No consumer Makefile is required.
+
+### Runner and configuration
+
+Use an ephemeral Linux x86-64 runner with KVM, network access and `contents: read`.
+Check out the consumer repository with `persist-credentials: false`. Reserve a
+90-minute job timeout for installation, startup, testing and cleanup. Pin all
+three VM actions to the same reviewed full commit SHA.
+
+`vm-config` must point to an existing file within the checkout, using the format
+for the selected backend below. Missing or blank input fails before allocating
+a runtime. Your repository supplies the image and resource settings; no default
+configuration is supplied. Treat configuration and scripts as trusted repository code.
+
+### Choose a backend
+
+| Need                                                             | `backend`        | `vm-config`          |
+| ---------------------------------------------------------------- | ---------------- | -------------------- |
+| Start an image and provision it with Lima                        | `lima` (default) | Lima YAML            |
+| Test an unattended installer ISO, or boot a QCOW2 image directly | `qemu`           | JSON described below |
+
+Both choices create a VM with the same outputs and testing and cleanup actions.
+
+#### Lima
+
+Omit `backend` or set it to `lima`. The
+[test fixture](../../../tests/fixture/lima.yml) provides a digest-pinned Ubuntu
+configuration. The action installs Lima and QEMU and starts the guest in plain
+mode: host mounts, SSH agent forwarding and dynamic port forwarding are disabled.
+Provisioning defined in the configuration still runs. Lima tools can use the
+returned `name` with `LIMA_HOME` set to `vm`.
+
+#### Direct QEMU
+
+Set `backend: qemu` to boot an unattended installer ISO, such as Proxmox, directly
+on the runner. QEMU uses KVM, UEFI and a private raw disk
+under `/var/tmp/iac-qemu-<uid>-<random>`. Lima's maintained setup action installs
+the host dependencies; this backend does not start a Lima guest.
+Supply a JSON `vm-config` with explicit resources, media, network and SSH identity:
+
+```json
+{
+  "cpus": 2,
+  "memoryMiB": 4096,
+  "diskGiB": 32,
+  "diskSerial": "TEST_DISK",
+  "iso": ".local/test/installer.iso",
+  "network": {
+    "subnet": "192.0.2.0/24",
+    "address": "192.0.2.10",
+    "gateway": "192.0.2.1",
+    "dns": "192.0.2.2",
+    "mac": "02:00:00:00:00:01"
+  },
+  "ssh": { "user": "root", "privateKey": ".local/test/key" }
+}
+```
+
+All media and keys must be regular checkout files. Use synthetic credentials.
+Consumers verify downloads and prepare the ISO's unattended answer with matching
+network, disk serial and SSH public key. The installer must power off on success;
+the action then boots the installed disk without the ISO and waits for SSH.
+Alternatively replace `iso` with a trusted `image` (QCOW2), optionally supplying
+a cloud-init `seed` ISO. The image is converted to a private raw disk, then resized.
+Images must fit diskGiB. No arbitrary QEMU arguments or host disks are accepted.
+Limits are 1–16 CPUs, 1–65536 MiB memory and 1–128 GiB disk. The runner must have
+sufficient disk-backed storage and memory. Network addresses must be distinct
+hosts in the supplied IPv4 subnet (prefix 8–30); MAC addresses start with `02`.
+
+SSH is exposed on a dynamically allocated loopback port, with a private key and
+known-hosts file. Initial trust is confined to that owned endpoint; later calls
+require the recorded host key.
+The startup budget is checked while waiting for installer power-off and SSH
+readiness. Preparation and subprocesses have their own bounded deadlines;
+allow extra time for them and cleanup in the job timeout. Startup failure
+attempts verified rollback; always schedule `vm/destroy` to retry cleanup.
+Reports belong to `vm/test`; no raw console logs, keys or VM state are published.
+Application readiness checks remain in consumer tests.
 
 ### Startup and cleanup
 
-The action installs Lima and QEMU and allocates a private
-`/tmp/iac-<uid>-<random>` runtime. It exports `vm` before starting the guest so
-cleanup can retry after startup failure. Startup defaults to ten minutes, with
-one additional minute for the subprocess deadline; `startup-timeout-minutes`
-allows longer provisioning. Failed startup rolls back partial creation.
-The runtime is retained if rollback
-cannot verify removal; keep the `always()` destruction step and let failures
-fail the job. Never upload the runtime directory, which contains SSH keys and
-VM state. Forced runner termination can interrupt cleanup; ephemeral runner
-disposal bounds remaining resources. Persistent runners and cloud resources
-are outside this action's scope.
+The action allocates a private runtime directory and exports it as `vm` before
+starting the guest, so cleanup can retry after startup failure. The startup
+budget defaults to ten minutes and accepts 1 to 40 minutes through
+`startup-timeout-minutes`. Lima adds one minute to its startup subprocess deadline.
+Failed startup rolls back
+partial creation. The runtime is retained if rollback cannot verify removal;
+keep the `always()` destruction step and let failures fail the job.
 
-Host-side test tools can use the returned `name` with `LIMA_HOME` set to `vm`.
-Keep their SSH configuration private. If a scenario creates external resources,
-verify its cleanup before calling `vm/destroy`; destruction cannot verify
+Never upload the runtime directory, which contains SSH keys and VM state.
+Forced runner termination can interrupt cleanup; ephemeral runner disposal
+bounds remaining resources. Persistent runners and cloud resources are outside
+this action's scope. If a scenario creates external resources, verify their
+cleanup before calling `vm/destroy`; destruction cannot verify
 application-specific resources such as remote browser devices.
+
+### SSH access
+
+For host tools, both backends return a private `ssh-config` and a `name` to use
+as the SSH host alias: `ssh -F <ssh-config> <name> uname -s`. Keep the SSH
+configuration private. `vm/test` uses it internally to open fresh guest logins.
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -89,11 +174,15 @@ application-specific resources such as remote browser devices.
 ```yaml
 - uses: hoverkraft-tech/ci-github-iac/actions/vm/create@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
-    # Path to a Lima YAML file in the checkout. Plain mode is enforced.
+    # Creation backend, lima (default) or qemu. Testing and cleanup use the returned vm reference without another backend choice.
+    # Default: `lima`
+    backend: lima
+
+    # Checkout configuration file. Lima uses YAML in plain mode; QEMU uses the JSON schema described above.
     # This input is required.
     vm-config: ""
 
-    # Guest startup timeout, from 1 to 40 minutes. The subprocess deadline includes one additional minute.
+    # Startup budget, from 1 to 40 minutes. Lima adds one minute to its startup subprocess deadline; QEMU checks the budget during installation and SSH readiness, with separate subprocess deadlines.
     # Default: `10`
     startup-timeout-minutes: "10"
 ```
@@ -103,10 +192,11 @@ application-specific resources such as remote browser devices.
 
 ## Inputs
 
-| **Input**                     | **Description**                                                                                      | **Required** | **Default** |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| **`vm-config`**               | Path to a Lima YAML file in the checkout. Plain mode is enforced.                                    | **true**     | -           |
-| **`startup-timeout-minutes`** | Guest startup timeout, from 1 to 40 minutes. The subprocess deadline includes one additional minute. | **false**    | `10`        |
+| **Input**                     | **Description**                                                                                                                                                                                  | **Required** | **Default** |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | ----------- |
+| **`backend`**                 | Creation backend, lima (default) or qemu. Testing and cleanup use the returned vm reference without another backend choice.                                                                      | **false**    | `lima`      |
+| **`vm-config`**               | Checkout configuration file. Lima uses YAML in plain mode; QEMU uses the JSON schema described above.                                                                                            | **true**     | -           |
+| **`startup-timeout-minutes`** | Startup budget, from 1 to 40 minutes. Lima adds one minute to its startup subprocess deadline; QEMU checks the budget during installation and SSH readiness, with separate subprocess deadlines. | **false**    | `10`        |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -115,20 +205,36 @@ application-specific resources such as remote browser devices.
 
 ## Outputs
 
-| **Output** | **Description**                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------ |
-| **`vm`**   | Private Lima runtime directory for subsequent VM actions; allocated before startup.        |
-| **`id`**   | Unique identifier for this invocation.                                                     |
-| **`name`** | Lima instance name for host-side tools. Set LIMA_HOME to the vm output on the same runner. |
+| **Output**       | **Description**                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **`ssh-config`** | Private SSH configuration for either backend, using the returned name as host alias. Never upload it.                         |
+| **`vm`**         | VM reference for testing and cleanup on the same runner; the path to its private runtime directory, allocated before startup. |
+| **`name`**       | Instance name and host alias for the returned ssh-config.                                                                     |
 
 <!-- outputs:end -->
 <!-- examples:start -->
 <!-- examples:end -->
 <!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md) for more details.
+
 <!-- contributing:end -->
 <!-- security:start -->
 <!-- security:end -->
 <!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2026 Hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
 <!-- license:end -->
 <!-- generated:start -->
 

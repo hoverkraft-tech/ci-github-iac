@@ -1,5 +1,9 @@
 # Run Ansible tests with maintained upstream actions and native JUnit reports.
 #
+# For Ansible integration scenarios with a configurable target environment, use
+# [ansible/test-molecule](../test-molecule/README.md). This action tests Ansible content
+# without managing a VM or running a deployment lifecycle.
+#
 # ### Run tests
 #
 # Check out the consumer on a fresh Linux GitHub-hosted runner. Supply its existing
@@ -13,8 +17,8 @@
 # the runner's Python; that Python must be supported by the selected Ansible Core.
 # Ansible's built-in JUnit callback writes task results, including failed assertions.
 # Provide test assertions and disposable targets, never a deployment playbook.
-# `inventory`, `ansible-config`, `collections-path` and `galaxy-requirements`
-# configure test execution. The action does not provision test environments.
+# Use `ansible-config` for inventory and collection search paths, and
+# `galaxy-requirements` for dependencies. The action does not provision test environments.
 #
 # Collection sanity uses the maintained Ansible community
 # [ansible-test action](https://github.com/ansible-community/ansible-test-gh-action),
@@ -40,7 +44,7 @@
 # action does not export its report output. Reports are uploaded with a unique
 # artifact name and seven-day retention, including after parsing or commenting
 # errors. Missing reports fail the action. Failed tests remain failures. No custom
-# test runner, Docker lifecycle or JUnit generator is maintained here.
+# test runner or Docker lifecycle is maintained here.
 #
 # Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
 # Never run untrusted tests through `pull_request_target`. Use distinct report names
@@ -65,14 +69,8 @@ inputs:
   target-python-version:
     description: Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.
     default: ""
-  inventory:
-    description: Optional checkout-relative inventory file for test playbook execution.
-    default: ""
   ansible-config:
     description: Optional checkout-relative ansible.cfg file for test playbook execution.
-    default: ""
-  collections-path:
-    description: Optional checkout-relative first-party collection search directory containing ansible_collections.
     default: ""
   galaxy-requirements:
     description: Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.
@@ -80,25 +78,6 @@ inputs:
   report-name:
     description: Stable summary and PR comment title, distinct for each test step or matrix entry.
     default: Ansible test results
-  github-token:
-    description: Token for PR comments; requires pull-requests write. Fork and Dependabot comments are skipped.
-    default: ${{ github.token }}
-outputs:
-  report-files:
-    description: Newline-separated absolute paths of completed native reports, including after check failure.
-    value: ${{ steps.collect.outputs.report-files }}
-  summary:
-    description: Parsed validation summary.
-    value: ${{ steps.parse.outputs.summary }}
-  markdown:
-    description: Markdown used for the PR comment.
-    value: ${{ steps.parse.outputs.markdown }}
-  parsed-files:
-    description: JSON array of parsed report paths.
-    value: ${{ steps.parse.outputs.parsed-files }}
-  artifact-id:
-    description: Uploaded report artifact identifier.
-    value: ${{ steps.upload.outputs.artifact-id }}
 runs:
   using: composite
   steps:
@@ -106,18 +85,21 @@ runs:
       id: inputs
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
-        ANSIBLE_ACTION_PATH: ${{ github.action_path }}
-        ANSIBLE_PHASE: prepare
+        ACTION_PATH: ${{ github.action_path }}
         ANSIBLE_REQUIREMENTS: ${{ inputs.ansible-requirements }}
         ANSIBLE_TEST_PLAYBOOK: ${{ inputs.test-playbook }}
         ANSIBLE_COLLECTION: ${{ inputs.collection }}
         ANSIBLE_TARGET_PYTHON_VERSION: ${{ inputs.target-python-version }}
-        ANSIBLE_INVENTORY_FILE: ${{ inputs.inventory }}
         ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
-        ANSIBLE_COLLECTIONS_DIRECTORY: ${{ inputs.collections-path }}
         ANSIBLE_GALAXY_REQUIREMENTS: ${{ inputs.galaxy-requirements }}
       with:
-        script: require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
+        script: |
+          try {
+            const { AnsibleInputs } = require(`${process.env.ACTION_PATH}/inputs.cjs`);
+            new AnsibleInputs(core, process.env).prepare();
+          } catch (error) {
+            core.setFailed(error.message);
+          }
 
     - name: Install the pinned Ansible test runtime
       if: steps.inputs.outputs.mode == 'playbook'
@@ -134,8 +116,6 @@ runs:
       uses: dawidd6/action-ansible-playbook@126642a1c6ce512da255ef2b41e8ee90f0077474 # v9
       env:
         ANSIBLE_CONFIG: ${{ steps.inputs.outputs.config }}
-        ANSIBLE_INVENTORY: ${{ steps.inputs.outputs.inventory }}
-        ANSIBLE_COLLECTIONS_PATH: ${{ steps.inputs.outputs.collections-path }}
         ANSIBLE_CALLBACKS_ENABLED: ansible.builtin.junit
         JUNIT_OUTPUT_DIR: ${{ steps.inputs.outputs.report-directory }}
         JUNIT_TASK_RELATIVE_PATH: ${{ github.workspace }}
@@ -162,12 +142,17 @@ runs:
       if: ${{ always() && steps.inputs.outcome == 'success' }}
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
-        ANSIBLE_ACTION_PATH: ${{ github.action_path }}
-        ANSIBLE_PHASE: collect
+        ACTION_PATH: ${{ github.action_path }}
         ANSIBLE_REPORT_DIRECTORY: ${{ steps.inputs.outputs.report-directory }}
         ANSIBLE_COLLECTION_ROOT: ${{ steps.sanity.outputs.checkout-directory || steps.inputs.outputs.collection }}
       with:
-        script: require(`${process.env.ANSIBLE_ACTION_PATH}/index.cjs`)({ core });
+        script: |
+          try {
+            const { AnsibleReports } = require(`${process.env.ACTION_PATH}/reports.cjs`);
+            await new AnsibleReports(core, process.env, glob).collect();
+          } catch (error) {
+            core.setFailed(error.message);
+          }
 
     - name: Parse Ansible reports
       if: ${{ always() && steps.collect.outputs.report-files != '' }}
@@ -186,7 +171,7 @@ runs:
       with:
         title: ${{ inputs.report-name }}
         body: ${{ steps.parse.outputs.markdown }}
-        token: ${{ inputs.github-token }}
+        token: ${{ github.token }}
 
     - name: Upload Ansible reports
       if: ${{ always() && steps.collect.outputs.report-files != '' }}

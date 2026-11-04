@@ -15,8 +15,24 @@ updates:
     groups:
       docker-dependencies:
         patterns: ["*"]
+  - package-ecosystem: npm
+    directories:
+      - /actions/ansible/test
+      - /actions/ansible/test-molecule
+      - /actions/vm/create
+      - /actions/vm/test
+      - /actions/vm/destroy
+    cooldown:
+      default-days: 7
+    schedule:
+      interval: weekly
+    groups:
+      github-script-test-helpers:
+        patterns: ["@actions/*"]
   - package-ecosystem: pip
-    directory: /tests/fixture/ansible
+    directories:
+      - /tests/fixture/ansible
+      - /actions/ansible/test-molecule
     cooldown:
       default-days: 7
     schedule:

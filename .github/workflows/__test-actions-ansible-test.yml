@@ -1,13 +1,33 @@
 ---
-name: Internal - Test Ansible action
+name: Internal - Test ansible/test
 on:
   workflow_call:
 permissions: {}
 jobs:
+  unit-tests:
+    # Standard runner and checkout setup; each action owns its test command below.
+    # jscpd:ignore-start
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Arrange - Checkout action sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # jscpd:ignore-end
+      - name: Act - Run ansible/test unit tests
+        uses: hoverkraft-tech/ci-github-nodejs/actions/test@97f64bc080b78daca8fb3ece49de448aaac83429 # 1.1.0
+        with:
+          working-directory: actions/ansible/test
+          command: test:ci
+          coverage: ""
   scenarios:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      actions: read
       contents: read
       pull-requests: write
     strategy:
@@ -16,11 +36,11 @@ jobs:
         mode: [playbook, sanity]
         result: [success, failure]
     steps:
-      - name: Checkout fixture
+      - name: Arrange - Checkout fixture
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Prepare selected scenario without a consumer Makefile
+      - name: Arrange - Prepare selected scenario without a consumer Makefile
         env:
           MODE: ${{ matrix.mode }}
           RESULT: ${{ matrix.result }}
@@ -29,7 +49,7 @@ jobs:
           if [ "$RESULT" = failure ] && [ "$MODE" = sanity ]; then
             printf '%s\n' '---' 'invalid: [' > tests/fixture/ansible/ansible_collections/example/smoke/roles/smoke/tasks/main.yml
           fi
-      - name: Test Ansible with upstream actions
+      - name: Act - Test Ansible with upstream actions
         id: test
         continue-on-error: true
         uses: $/actions/ansible/test
@@ -37,28 +57,22 @@ jobs:
           FIXTURE_RESULT: ${{ matrix.result }}
         with:
           ansible-requirements: tests/fixture/ansible/requirements.txt
+          ansible-config: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/ansible.cfg' || '' }}
           test-playbook: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/valid.yml' || '' }}
           collection: ${{ matrix.mode == 'sanity' && 'tests/fixture/ansible/ansible_collections/example/smoke' || '' }}
           report-name: Ansible tests - ${{ matrix.mode }} - ${{ matrix.result }}
-      - name: Verify check outcomes and native reports
+      - name: Assert - Verify check outcomes and native reports
         if: ${{ always() }}
         env:
-          MODE: ${{ matrix.mode }}
           EXPECTED: ${{ matrix.result }}
           OUTCOME: ${{ steps.test.outcome }}
-          REPORTS: ${{ steps.test.outputs.report-files }}
-          PARSED: ${{ steps.test.outputs.parsed-files }}
-          ARTIFACT: ${{ steps.test.outputs.artifact-id }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const assert = require('node:assert/strict');
-            const fs = require('node:fs');
+            const { PublishedReports } = require('./tests/helpers/published-reports.cjs');
+            const published = new PublishedReports(github, context);
             assert.equal(process.env.OUTCOME, process.env.EXPECTED);
-            const files = process.env.REPORTS.split('\n').filter(Boolean);
-            assert.ok(files.length > 0);
-            assert.deepEqual(JSON.parse(process.env.PARSED).sort(), files.sort());
-            assert.ok(process.env.ARTIFACT);
-            assert.ok(files.every(file => file.endsWith('.xml')));
-            const reports = files.map(file => fs.readFileSync(file, 'utf8')).join('\n');
-            assert.equal(/<(?:failure|error)\b/.test(reports), process.env.EXPECTED === 'failure');
+            const [report] = await published.read('ansible-reports-', 1);
+            assert.ok(report.files.every(file => file.endsWith('.xml')));
+            assert.equal(/<(?:failure|error)\b/.test(report.text), process.env.EXPECTED === 'failure');

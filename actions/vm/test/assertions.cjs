@@ -1,10 +1,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { Workspace } = require("../_internal/workspace.cjs");
 const { GuestReports } = require("./reports.cjs");
+const { GossSuite } = require("./goss.cjs");
 
 class GuestAssertions {
-	constructor(source, directory, minutes = "10", reportFiles = "") {
+	constructor(source, directory, minutes = "10") {
 		if (!directory || !path.isAbsolute(directory)) {
 			throw new Error("Expected an absolute report directory");
 		}
@@ -18,35 +18,31 @@ class GuestAssertions {
 			);
 		}
 		this.timeout = Number(minutes) * 60000;
-		this.source = source;
 		this.directory = directory;
-		this.guestReports = new GuestReports(reportFiles);
+		if (!source.goss?.trim()) throw new Error("goss-file is required");
+		this.goss = new GossSuite(source.goss, source.variables);
+		this.guestReports = new GuestReports();
 	}
 
-	readCommand() {
-		const { command = "", script = "" } = this.source;
-		if (Boolean(command.trim()) === Boolean(script.trim()))
-			throw new Error("Provide exactly one of command or test-script");
-		const content = command.trim()
-			? command
-			: fs.readFileSync(new Workspace().file(script), "utf8");
-		if (!content.trim()) throw new Error("The test command must not be empty");
-		return content;
-	}
-
-	run(vm) {
+	async run(vm, { exec, io }) {
 		this.report = undefined;
 		this.reportFiles = [];
-		fs.mkdirSync(this.directory, { recursive: true });
+		await io.mkdirP(this.directory);
 		const directory = fs.mkdtempSync(path.join(this.directory, "vm-test-"));
 		this.id = path.basename(directory);
 		const report = path.join(directory, "e2e.junit.xml");
 		const started = performance.now();
 		let failed = false;
 		try {
-			const command = this.readCommand();
-			const environment = this.guestReports.prepare(vm);
-			vm.command(
+			const environment = await this.guestReports.prepare(vm, this.timeout);
+			const command = await this.goss.prepare(
+				vm,
+				directory,
+				this.guestReports.home,
+				Math.max(1, Math.ceil(this.timeout - (performance.now() - started))),
+				{ exec, io },
+			);
+			await vm.command(
 				[
 					"shell",
 					"--workdir=/tmp",
@@ -58,7 +54,10 @@ class GuestAssertions {
 					"-s",
 				],
 				{
-					timeout: this.timeout,
+					timeout: Math.max(
+						1,
+						Math.ceil(this.timeout - (performance.now() - started)),
+					),
 					input: command,
 				},
 			);
@@ -66,12 +65,21 @@ class GuestAssertions {
 			failed = true;
 		}
 		try {
-			this.reportFiles = this.guestReports.collect(vm, directory);
+			this.reportFiles = await this.guestReports.collect(vm, directory, {
+				io,
+			});
+			try {
+				this.goss.validateReports(this.reportFiles);
+			} catch (error) {
+				// Empty native suites cannot replace the failed execution summary.
+				this.reportFiles = [];
+				throw error;
+			}
 		} catch {
 			failed = true;
 		} finally {
 			try {
-				this.guestReports.cleanup(vm);
+				await this.guestReports.cleanup(vm, io);
 			} catch {
 				failed = true;
 			}
@@ -86,17 +94,16 @@ class GuestAssertions {
 				report,
 				'<?xml version="1.0" encoding="UTF-8"?>\n' +
 					`<testsuite name="disposable-vm" tests="1" failures="${failed ? 1 : 0}">` +
-					`<testcase name="consumer-command" time="${duration}">${failure}</testcase></testsuite>\n`,
+					`<testcase name="goss-execution" time="${duration}">${failure}</testcase></testsuite>\n`,
 				{ flag: "wx" },
 			);
 		} catch (error) {
-			fs.rmSync(report, { force: true });
-			if (!this.reportFiles.length)
-				fs.rmSync(directory, { recursive: true, force: true });
+			await io.rmRF(report);
+			if (!this.reportFiles.length) await io.rmRF(directory);
 			throw error;
 		}
 		this.report = report;
-		if (failed) throw new Error("Consumer assertions failed");
+		if (failed) throw new Error("Goss assertions failed");
 	}
 }
 

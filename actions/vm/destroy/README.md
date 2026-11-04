@@ -2,26 +2,35 @@
 
 # ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItdHJhc2gtMiIgY29sb3I9InB1cnBsZSI+PHBvbHlsaW5lIHBvaW50cz0iMyA2IDUgNiAyMSA2Ij48L3BvbHlsaW5lPjxwYXRoIGQ9Ik0xOSA2djE0YTIgMiAwIDAgMS0yIDJIN2EyIDIgMCAwIDEtMi0yVjZtMyAwVjRhMiAyIDAgMCAxIDItMmg0YTIgMiAwIDAgMSAyIDJ2MiI+PC9wYXRoPjxsaW5lIHgxPSIxMCIgeTE9IjExIiB4Mj0iMTAiIHkyPSIxNyI+PC9saW5lPjxsaW5lIHgxPSIxNCIgeTE9IjExIiB4Mj0iMTQiIHkyPSIxNyI+PC9saW5lPjwvc3ZnPg==) GitHub Action: VM - Destroy
 
+<div align="center">
+  <img src="../../../.github/logo.svg" width="60px" align="center" alt="VM - Destroy" />
+</div>
+
+---
+
 <!-- header:end -->
 <!-- badges:start -->
 
 [![Marketplace](https://img.shields.io/badge/Marketplace-vm------destroy-blue?logo=github-actions)](https://github.com/marketplace/actions/vm---destroy)
 [![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-iac)](https://github.com/hoverkraft-tech/ci-github-iac/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-iac)](http://choosealicense.com/licenses/mit/)
 [![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md)
 
 <!-- badges:end -->
 <!-- overview:start -->
 
 ## Overview
 
-Delete an owned Lima VM, verify deletion and remove its runtime directory.
+Delete an owned VM, verify deletion and remove its runtime directory.
 
 Destroy the guest and verify absence before removing its private runtime and keys.
 
 ### Schedule cleanup
 
 Pass the original `vm` output from [vm/create](../create/README.md) on the same
-runner. Run this step after all [vm/test](../test/README.md) calls and reporting:
+runner. Cleanup selects the matching backend automatically. Run this step after
+all VM and Ansible tests and reporting, including if an earlier step failed:
 
 ```yaml
 - name: Destroy VM
@@ -38,9 +47,9 @@ additional GitHub permission is needed. Do not suppress cleanup failures.
 ### Verification and recovery
 
 Destruction accepts only an owned private runtime created by `vm/create`. It
-verifies guest absence before deleting the runtime and SSH keys. `removed` is
-true only after verified cleanup. Lima deletion and verification commands have
-two-minute deadlines and a 1 MiB output limit per stream.
+verifies guest absence before deleting the runtime and SSH keys.
+Backend operations have bounded deadlines;
+destruction fails if it cannot verify removal of the owned VM.
 
 Failed cleanup fails the step and retains the runtime for recovery. Retry with
 another `vm/destroy` step using `if: always()` and the original `vm` output on
@@ -59,7 +68,7 @@ and cloud resource cleanup are outside scope.
 ```yaml
 - uses: hoverkraft-tech/ci-github-iac/actions/vm/destroy@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
-    # Private runtime directory returned by vm/create; repeated deletion is safe.
+    # VM reference returned by vm/create in the same job; works with either creation backend. Repeated deletion is safe.
     # This input is required.
     vm: ""
 ```
@@ -69,29 +78,38 @@ and cloud resource cleanup are outside scope.
 
 ## Inputs
 
-| **Input** | **Description**                                                             | **Required** | **Default** |
-| --------- | --------------------------------------------------------------------------- | ------------ | ----------- |
-| **`vm`**  | Private runtime directory returned by vm/create; repeated deletion is safe. | **true**     | -           |
+| **Input** | **Description**                                                                                                    | **Required** | **Default** |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | ------------ | ----------- |
+| **`vm`**  | VM reference returned by vm/create in the same job; works with either creation backend. Repeated deletion is safe. | **true**     | -           |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
 <!-- secrets:end -->
 <!-- outputs:start -->
-
-## Outputs
-
-| **Output**    | **Description**                                                 |
-| ------------- | --------------------------------------------------------------- |
-| **`removed`** | True only after verified deletion of the guest and its runtime. |
-
 <!-- outputs:end -->
 <!-- examples:start -->
 <!-- examples:end -->
 <!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md) for more details.
+
 <!-- contributing:end -->
 <!-- security:start -->
 <!-- security:end -->
 <!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2026 Hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
 <!-- license:end -->
 <!-- generated:start -->
 

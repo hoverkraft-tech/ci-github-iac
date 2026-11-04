@@ -1,6 +1,5 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const os = require("node:os");
 
 class AnsibleInputs {
 	constructor(core, env) {
@@ -40,9 +39,9 @@ class AnsibleInputs {
 			);
 		}
 		this.core.setOutput("target-python-version", targetPython);
-		if (Boolean(playbook) === Boolean(collection)) {
+		if ([playbook, collection].filter(Boolean).length !== 1) {
 			throw new Error(
-				"Provide test-playbook or one collection, exclusively. Use a matrix for multiple collections.",
+				"Provide exactly one test-playbook or collection. Use a matrix for multiple targets.",
 			);
 		}
 		const requirements = this.checkoutPath(this.env.ANSIBLE_REQUIREMENTS);
@@ -65,26 +64,12 @@ class AnsibleInputs {
 		if (collectionRoot)
 			this.checkoutPath(path.join(collectionRoot, "galaxy.yml"));
 		const optionalFiles = {
-			inventory: this.env.ANSIBLE_INVENTORY_FILE,
 			config: this.env.ANSIBLE_CONFIG_FILE,
 			galaxy: this.env.ANSIBLE_GALAXY_REQUIREMENTS,
 		};
 		for (const [name, value] of Object.entries(optionalFiles)) {
 			this.core.setOutput(name, value ? this.checkoutPath(value) : "");
 		}
-		const collectionsPath = this.env.ANSIBLE_COLLECTIONS_DIRECTORY
-			? this.checkoutPath(this.env.ANSIBLE_COLLECTIONS_DIRECTORY, true)
-			: "";
-		this.core.setOutput(
-			"collections-path",
-			[
-				collectionsPath,
-				path.join(os.homedir(), ".ansible/collections"),
-				"/usr/share/ansible/collections",
-			]
-				.filter(Boolean)
-				.join(":"),
-		);
 		const reports = fs.mkdtempSync(
 			path.join(this.env.RUNNER_TEMP, "ansible-reports-"),
 		);

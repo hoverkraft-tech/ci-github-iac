@@ -2,98 +2,72 @@
 
 # ![Icon](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJmZWF0aGVyIGZlYXRoZXItY2hlY2stY2lyY2xlIiBjb2xvcj0icHVycGxlIj48cGF0aCBkPSJNMjIgMTEuMDhWMTJhMTAgMTAgMCAxIDEtNS45My05LjE0Ij48L3BhdGg+PHBvbHlsaW5lIHBvaW50cz0iMjIgNCAxMiAxNC4wMSA5IDExLjAxIj48L3BvbHlsaW5lPjwvc3ZnPg==) GitHub Action: VM - Test
 
+<div align="center">
+  <img src="../../../.github/logo.svg" width="60px" align="center" alt="VM - Test" />
+</div>
+
+---
+
 <!-- header:end -->
 <!-- badges:start -->
 
 [![Marketplace](https://img.shields.io/badge/Marketplace-vm------test-blue?logo=github-actions)](https://github.com/marketplace/actions/vm---test)
 [![Release](https://img.shields.io/github/v/release/hoverkraft-tech/ci-github-iac)](https://github.com/hoverkraft-tech/ci-github-iac/releases)
+[![License](https://img.shields.io/github/license/hoverkraft-tech/ci-github-iac)](http://choosealicense.com/licenses/mit/)
 [![Stars](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)](https://img.shields.io/github/stars/hoverkraft-tech/ci-github-iac?style=social)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md)
 
 <!-- badges:end -->
 <!-- overview:start -->
 
 ## Overview
 
-Run guest test commands, parse reports, comment on pull requests and upload results.
+Validate VM state with Goss, publish summaries and PR comments, and upload JUnit results.
 
-Execute guest tests, collect reports and publish coverage results.
+Validate a disposable Linux VM with Goss and publish JUnit results.
 
-### Execute guest commands
+Pass the `vm` output from [vm/create](../create/README.md) in the same job and
+a required checkout-relative `goss-file`. The action works with both creation
+backends. Always schedule [vm/destroy](../destroy/README.md), including after
+assertion or report publication failure. Testing leaves the VM running.
 
-Pass the `vm` output of [vm/create](../create/README.md) from the same job and
-exactly one of `command` or `test-script`. Commands accept a YAML multiline
-block; a script must be a nonempty file within the checkout. Both execute in
-guest Bash with `-euo pipefail`, through standard input, starting in `/tmp`.
-Checkout files and host environment variables are not copied into the guest.
-Use self-contained scripts or code prepared by Lima provisioning. Nonzero exit
-or timeout fails the action; the timeout accepts 1 to 40 minutes, default 10.
+### Write a suite
 
-Testing leaves the guest running for additional test steps. Always schedule
-[vm/destroy](../destroy/README.md) afterward, including after test or reporting
-failure. The [action-test workflow](../../../.github/workflows/__test-actions-vm.yml)
-demonstrates composition and failure assertions.
+Use Goss resources for files, packages, services, users and commands. Keep
+deployment, idempotence and reboot in Ansible Molecule scenarios. Complex checks
+can invoke consumer-owned probes already installed in the guest; checkout files
+other than the rendered suite are not copied automatically.
 
-### Collect test-generated reports
+The action downloads and verifies the pinned Goss release, renders the suite,
+includes and optional `goss-vars` on the runner, then copies the binary and
+rendered suite to the guest. Templates therefore use runner environment values;
+pass guest-specific expectations through `goss-vars`. Goss runs as the SSH user
+through a fresh login so group changes made during provisioning take effect.
+Both runner and guest must be Linux x86-64. The guest needs Bash, uname, chmod,
+GNU find and an SSH file-copy service. Consumers need no Goss installation.
 
-Configure test tools to write into the fresh guest directory in `REPORTS_DIR`.
-Set `report-file` to relative paths or glob patterns, for example:
-
-```yaml
-report-file: |
-  junit.xml
-  coverage/*.info
-```
-
-Lists accept newlines, commas or semicolons. Basic `*`, `**`, `?` and character
-class globs are supported. Use filenames containing letters, digits, spaces,
-dots, underscores or hyphens. Absolute paths and parent traversal are rejected;
-symbolic links are excluded. Every pattern must match a nonempty regular file.
-Collection is limited to 100 files, 20 MiB total and two minutes. Guests need
-Bash, GNU find and an SSH file-copy service, as provided by the Ubuntu fixture.
-
-Collection is attempted after command failure or timeout, then the guest report
-directory is removed. Missing files, incomplete transfers and cleanup errors
-fail the action. An incomplete collection exports no guest files. Completed
-files retain their relative names in an isolated host directory; `report-files`
-lists their absolute paths. See the [success](../../../tests/fixture/assert.sh)
-and [failure](../../../tests/fixture/fail.sh) fixtures for report examples.
-
-Each invocation keeps separate reports under `runner.temp`; later calls preserve
-earlier results. `report` is a sanitized command-status JUnit file without raw
-command output or exceptions. Only completed files are exported; failed writes
-discard partial output and preserve completed guest reports. Collected tool
-reports retain their original contents. Use synthetic data and exclude secrets,
-environment dumps and private logs from reports published by public workflows.
+Setup and execution share `test-timeout-minutes` (1 to 40, default 10).
+Collection has a separate two-minute limit and accepts only the native Goss
+report, a nonempty regular file up to 20 MiB. Missing, empty and fully skipped
+suites fail. Reports are collected after failed assertions; private guest test
+files are then removed. Incomplete transfers are never published.
 
 ### Publish results
 
-| `coverage`         | Behavior                                   | Job permission                      |
-| ------------------ | ------------------------------------------ | ----------------------------------- |
-| `github` (default) | Summaries, annotations and PR comments     | `pull-requests: write` for comments |
-| `codecov`          | Upload selected guest reports through OIDC | `id-token: write`                   |
-| `""`               | Skip parsing, comments and Codecov         | No additional permission            |
+Each invocation publishes native JUnit plus a sanitized execution-status report
+through Hoverkraft's report parser: job summary, annotations and, on eligible
+pull requests, an updated comment. Use a distinct stable `report-name` for each
+step and matrix scenario. Comments use `github.token` and require
+`pull-requests: write`; forks and Dependabot still receive summaries and artifacts.
+Do not use `pull_request_target` to execute untrusted suites.
 
-GitHub mode uses Hoverkraft's `parse-ci-reports` and `create-or-update-comment`
-actions. It parses collected files, falling back to the command-status report
-when none are available. `path-mapping` translates guest paths to checkout paths;
-`summary`, `markdown` and `parsed-files` expose parser results. The parser manages
-its own dependencies.
+Completed reports are retained as a unique GitHub artifact for seven days, even
+after parser or comment failure. Raw command output and exceptions are excluded
+from the execution-status report. Native Goss reports retain assertion details:
+use synthetic expectations and never match or print credentials. Infrastructure
+assertions produce test results, not application code coverage.
 
-Choose a distinct, stable `report-name` for each test step and matrix scenario.
-Reruns update the matching comment. `github-token` defaults to `github.token`.
-Comments are limited to same-repository pull requests, excluding Dependabot;
-forks still receive summaries and artifacts. Do not use `pull_request_target`
-to execute untrusted tests.
-
-Codecov mode requires a repository enabled in Codecov and explicit `report-file`
-selection. Discovery is disabled: only collected guest files are uploaded, never
-the command-status wrapper. Configure Codecov path fixes when guest source paths
-differ from repository paths. Upload errors fail the action.
-
-Every mode uploads completed reports as a GitHub artifact with a unique name and
-seven-day retention; `artifact-id` identifies the upload. Upload still runs after
-parser, comment or Codecov errors. Test and reporting failures remain failures.
-No extra reporting steps are needed in the workflow.
+See the [lifecycle example](../create/README.md#compose-the-vm-actions).
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -103,44 +77,24 @@ No extra reporting steps are needed in the workflow.
 ```yaml
 - uses: hoverkraft-tech/ci-github-iac/actions/vm/test@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
   with:
-    # Private runtime directory returned by vm/create.
+    # VM reference returned by vm/create in the same job; works with either backend.
     # This input is required.
     vm: ""
 
-    # Bash command or multiline commands to execute inside the guest from /tmp.
-    # Provide exactly one of command or test-script. Checkout files are not mounted in the guest.
-    command: ""
+    # Required checkout-relative Goss suite, including any referenced Goss files.
+    # This input is required.
+    goss-file: ""
 
-    # Nonempty Bash script in the checkout to send to the guest instead of command.
-    test-script: ""
+    # Optional checkout-relative JSON or YAML variables file. Use values suitable for public reports.
+    goss-vars: ""
 
-    # Guest command timeout, from 1 to 40 minutes.
+    # Combined Goss setup and execution timeout, from 1 to 40 minutes.
     # Default: `10`
     test-timeout-minutes: "10"
-
-    # Optional report paths or glob patterns relative to the guest REPORTS_DIR.
-    # Separate patterns with newlines, commas or semicolons. Every pattern must match.
-    # Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.
-    # Report contents are preserved. Use only reports suitable for public CI.
-    report-file: ""
-
-    # Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,
-    # or empty to disable reporting. Report artifacts are always retained.
-    # Codecov requires report-file selection and id-token write permission for OIDC.
-    #
-    # Default: `github`
-    coverage: github
 
     # Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.
     # Default: `VM test results`
     report-name: VM test results
-
-    # Optional path mappings forwarded to Hoverkraft's report parser.
-    path-mapping: ""
-
-    # Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped.
-    # Default: `${{ github.token }}`
-    github-token: ${{ github.token }}
 ```
 
 <!-- usage:end -->
@@ -148,48 +102,42 @@ No extra reporting steps are needed in the workflow.
 
 ## Inputs
 
-| **Input**                  | **Description**                                                                                            | **Required** | **Default**           |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
-| **`vm`**                   | Private runtime directory returned by vm/create.                                                           | **true**     | -                     |
-| **`command`**              | Bash command or multiline commands to execute inside the guest from /tmp.                                  | **false**    | -                     |
-|                            | Provide exactly one of command or test-script. Checkout files are not mounted in the guest.                |              |                       |
-| **`test-script`**          | Nonempty Bash script in the checkout to send to the guest instead of command.                              | **false**    | -                     |
-| **`test-timeout-minutes`** | Guest command timeout, from 1 to 40 minutes.                                                               | **false**    | `10`                  |
-| **`report-file`**          | Optional report paths or glob patterns relative to the guest REPORTS_DIR.                                  | **false**    | -                     |
-|                            | Separate patterns with newlines, commas or semicolons. Every pattern must match.                           |              |                       |
-|                            | Commands receive a fresh REPORTS_DIR; matched files are collected even after test failure.                 |              |                       |
-|                            | Report contents are preserved. Use only reports suitable for public CI.                                    |              |                       |
-| **`coverage`**             | Coverage reporter; `github` for summaries and PR comments, `codecov` for upload,                           | **false**    | `github`              |
-|                            | or empty to disable reporting. Report artifacts are always retained.                                       |              |                       |
-|                            | Codecov requires report-file selection and id-token write permission for OIDC.                             |              |                       |
-| **`report-name`**          | Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.           | **false**    | `VM test results`     |
-| **`path-mapping`**         | Optional path mappings forwarded to Hoverkraft's report parser.                                            | **false**    | -                     |
-| **`github-token`**         | Token for coverage PR comments. Requires pull-requests write; fork and Dependabot PR comments are skipped. | **false**    | `${{ github.token }}` |
+| **Input**                  | **Description**                                                                                  | **Required** | **Default**       |
+| -------------------------- | ------------------------------------------------------------------------------------------------ | ------------ | ----------------- |
+| **`vm`**                   | VM reference returned by vm/create in the same job; works with either backend.                   | **true**     | -                 |
+| **`goss-file`**            | Required checkout-relative Goss suite, including any referenced Goss files.                      | **true**     | -                 |
+| **`goss-vars`**            | Optional checkout-relative JSON or YAML variables file. Use values suitable for public reports.  | **false**    | -                 |
+| **`test-timeout-minutes`** | Combined Goss setup and execution timeout, from 1 to 40 minutes.                                 | **false**    | `10`              |
+| **`report-name`**          | Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario. | **false**    | `VM test results` |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
 <!-- secrets:end -->
 <!-- outputs:start -->
-
-## Outputs
-
-| **Output**         | **Description**                                                                                               |
-| ------------------ | ------------------------------------------------------------------------------------------------------------- |
-| **`report`**       | Absolute path of the sanitized command-status JUnit report, including on assertion or collection failure.     |
-| **`report-files`** | Newline-separated absolute paths of completed guest report files. Empty when collection is disabled or fails. |
-| **`summary`**      | Parsed test and coverage summary in GitHub mode.                                                              |
-| **`markdown`**     | Markdown used for the coverage PR comment in GitHub mode.                                                     |
-| **`parsed-files`** | JSON array of report files parsed in GitHub mode.                                                             |
-| **`artifact-id`**  | Uploaded report artifact identifier.                                                                          |
-
 <!-- outputs:end -->
 <!-- examples:start -->
 <!-- examples:end -->
 <!-- contributing:start -->
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guidelines](https://github.com/hoverkraft-tech/ci-github-iac/blob/main/CONTRIBUTING.md) for more details.
+
 <!-- contributing:end -->
 <!-- security:start -->
 <!-- security:end -->
 <!-- license:start -->
+
+## License
+
+This project is licensed under the MIT License.
+
+SPDX-License-Identifier: MIT
+
+Copyright © 2026 Hoverkraft
+
+For more details, see the [license](http://choosealicense.com/licenses/mit/).
+
 <!-- license:end -->
 <!-- generated:start -->
 

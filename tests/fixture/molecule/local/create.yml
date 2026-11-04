@@ -1,0 +1,10 @@
+---
+- name: Create the local test resource
+  hosts: fixture
+  gather_facts: false
+  tasks:
+    - name: Create the isolated directory
+      ansible.builtin.file:
+        path: "{{ fixture_directory }}"
+        state: directory
+        mode: "0700"

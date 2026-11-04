@@ -1,0 +1,185 @@
+# Run a native Molecule scenario and publish its Ansible task reports.
+#
+# ### Run a scenario
+#
+# Molecule and Ansible run on the GitHub runner. Your scenario selects its inventory,
+# target environment and test sequence: containers, an existing test host or a VM.
+# This action installs the pinned tools, runs `molecule test`, and publishes results.
+# Use [ansible/test](../test/README.md) for test playbooks and collection sanity.
+#
+# ```yaml
+# - name: Test Ansible with Molecule
+#   uses: hoverkraft-tech/ci-github-iac/actions/ansible/test-molecule@<reviewed-full-commit-sha>
+#   with:
+#     molecule-scenario: tests/molecule/default
+#     ansible-requirements: requirements.txt
+#     report-name: Ansible integration tests
+# ```
+#
+# Supply a directory containing `molecule.yml` with
+# [Ansible-native configuration](https://docs.ansible.com/projects/molecule/ansible-native/).
+# Configure inventories, playbook locations, Galaxy dependencies and the sequence
+# in that file. The action supplies no base configuration, inventory or reboot step.
+# Use a workflow matrix to test multiple scenarios. The selected scenario must
+# produce native Ansible JUnit task reports; empty report sets fail.
+# The [local fixture](../../../tests/fixture/molecule/local/molecule.yml) runs
+# without a VM. Molecule's [container examples](https://docs.ansible.com/projects/molecule/examples/)
+# show how scenarios can manage container targets.
+#
+# ### Runtime and cleanup
+#
+# Use a fresh Linux GitHub-hosted runner. Supply an exact stable `ansible-core==X.Y.Z`
+# pin in `ansible-requirements`; the action installs that pin and its maintained
+# Molecule release into a private environment. The runner's Python must support both.
+# Configure extra target dependencies and collection search paths in the scenario
+# or `ansible-config`. Input files must remain inside the checkout and use letters,
+# digits, dots, underscores, hyphens and slashes.
+#
+# Molecule honors the scenario's native resource lifecycle and failure cleanup.
+# Scenarios that create resources must provide idempotent cleanup/destroy playbooks
+# and include destruction in their test sequence. If the test process is interrupted
+# or times out, the action retries native `molecule destroy` with a two-minute limit.
+# Timeouts and cleanup failures remain failures. Allow time for cleanup and reporting
+# in the job timeout. Forced runner termination can interrupt cleanup entirely;
+# externally hosted resources need their own recovery policy.
+#
+# ### Test an existing VM
+#
+# When a scenario needs a full OS, [vm/create](../../vm/create/README.md) can create
+# it in the same job. Pass its `ssh-config` and `name` outputs through step environment
+# variables referenced by your scenario's inventory. The
+# [QEMU fixture](../../../tests/fixture/molecule/smoke/molecule.yml) demonstrates
+# this connection and chooses to test reboot persistence. No VM input is required.
+# Keep [vm/destroy](../../vm/destroy/README.md) in an `always()` workflow step;
+# a scenario targeting an externally created VM must not destroy it itself.
+# [vm/test](../../vm/test/README.md) can verify the installed state afterward.
+#
+# ### Publish results
+#
+# Native task reports and a scenario status report are collected after failures.
+# Only JUnit files are published; inventory, runtime state and installed tools remain
+# private. Reports contain task results: use synthetic data and `no_log` for private values.
+#
+# Hoverkraft's report actions publish summaries, annotations and stable PR comments.
+# Grant `pull-requests: write` for comments; fork and Dependabot comments are skipped.
+# Never run untrusted tests through `pull_request_target`. Choose distinct report
+# names for separate scenarios. Reports are uploaded with a unique artifact name
+# and seven-day retention, including after parsing or commenting failures.
+---
+name: Ansible - Test Molecule
+description: Run native Molecule scenarios with native reports, PR comments and artifacts.
+author: Hoverkraft
+branding:
+  icon: check-circle
+  color: purple
+inputs:
+  molecule-scenario:
+    description: Checkout-relative directory containing molecule.yml. The scenario defines its inventory, playbooks and test sequence.
+    required: true
+  ansible-requirements:
+    description: Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
+    required: true
+  ansible-config:
+    description: Optional checkout-relative ansible.cfg for scenario execution and collection search paths.
+    default: ""
+  test-timeout-minutes:
+    description: Native test sequence deadline, from 1 to 40 minutes. Interrupted runs allow two additional minutes for scenario cleanup.
+    default: "20"
+  report-name:
+    description: Stable summary and PR comment title, distinct for each test step or matrix entry.
+    default: Molecule test results
+runs:
+  using: composite
+  steps:
+    - name: Prepare Molecule scenario
+      id: scenario-inputs
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        MOLECULE_SCENARIO: ${{ inputs.molecule-scenario }}
+        ANSIBLE_REQUIREMENTS: ${{ inputs.ansible-requirements }}
+        ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
+        ANSIBLE_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+      with:
+        script: |
+          try {
+            const { MoleculeInputs } = require(`${process.env.ACTION_PATH}/inputs.cjs`);
+            new MoleculeInputs(process.env).prepare(core);
+          } catch (error) {
+            core.setFailed(error.message);
+          }
+
+    - name: Install the pinned scenario test runtime
+      shell: bash
+      env:
+        REPORT_DIRECTORY: ${{ steps.scenario-inputs.outputs.report-directory }}
+        CONSTRAINT: ${{ steps.scenario-inputs.outputs.constraint }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        python3 -m venv "$REPORT_DIRECTORY/venv"
+        "$REPORT_DIRECTORY/venv/bin/pip" install --disable-pip-version-check -r "$CONSTRAINT" -r "$ACTION_PATH/requirements.txt"
+
+    - name: Run Molecule test sequence
+      id: scenario-execution
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        ANSIBLE_REPORT_DIRECTORY: ${{ steps.scenario-inputs.outputs.report-directory }}
+        MOLECULE_SCENARIO: ${{ steps.scenario-inputs.outputs.scenario }}
+        ANSIBLE_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+        ANSIBLE_CONFIG: ${{ steps.scenario-inputs.outputs.config }}
+      with:
+        script: |
+          try {
+            const { MoleculeScenario } = require(`${process.env.ACTION_PATH}/molecule.cjs`);
+            await new MoleculeScenario(process.env, { exec, glob }).run();
+          } catch (error) {
+            core.setFailed(error.message);
+          }
+
+    - name: Collect scenario reports
+      id: scenario-reports
+      if: ${{ always() && steps.scenario-inputs.outcome == 'success' }}
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        ANSIBLE_REPORT_DIRECTORY: ${{ steps.scenario-inputs.outputs.report-directory }}
+      with:
+        script: |
+          try {
+            const path = require('node:path');
+            const { MoleculeScenario } = require(path.join(process.env.ACTION_PATH, 'molecule.cjs'));
+            const files = await new MoleculeScenario(process.env, { glob }).collect();
+            core.setOutput('report-files', files.join('\n'));
+          } catch (error) {
+            core.setFailed(error.message);
+          }
+
+    - name: Parse scenario reports
+      if: ${{ always() && steps.scenario-reports.outputs.report-files != '' }}
+      id: parse-scenario-reports
+      uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+      with:
+        report-name: ${{ inputs.report-name }}
+        report-paths: ${{ steps.scenario-reports.outputs.report-files }}
+        path-mapping: ${{ github.workspace }}:.
+        output-format: summary,markdown,annotations
+
+    - name: Add scenario PR comment
+      if: >-
+        ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.parse-scenario-reports.outputs.markdown != '' }}
+      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+      with:
+        title: ${{ inputs.report-name }}
+        body: ${{ steps.parse-scenario-reports.outputs.markdown }}
+        token: ${{ github.token }}
+
+    - name: Upload scenario reports
+      if: ${{ always() && steps.scenario-reports.outputs.report-files != '' }}
+      id: upload-scenario-reports
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ steps.scenario-inputs.outputs.id }}
+        path: ${{ steps.scenario-reports.outputs.report-files }}
+        if-no-files-found: error
+        retention-days: 7

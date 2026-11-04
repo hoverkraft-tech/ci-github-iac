@@ -1,0 +1,19 @@
+{
+	"name": "vm-destroy-tests",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Unit tests for the vm/destroy action",
+	"license": "MIT",
+	"engines": {
+		"node": ">=24.8.0"
+	},
+	"scripts": {
+		"test": "node --test",
+		"pretest:ci": "node -e \"require('node:fs').mkdirSync('coverage', { recursive: true })\"",
+		"test:ci": "node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test"
+	},
+	"devDependencies": {
+		"@actions/exec": "1.1.1",
+		"@actions/io": "1.1.3"
+	}
+}

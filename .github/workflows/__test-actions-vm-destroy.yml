@@ -1,0 +1,115 @@
+---
+name: Internal - Test vm/destroy
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  unit-tests:
+    # Standard runner and checkout setup; each action owns its test command below.
+    # jscpd:ignore-start
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Arrange - Checkout action sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # jscpd:ignore-end
+      - name: Act - Run vm/destroy unit tests
+        uses: hoverkraft-tech/ci-github-nodejs/actions/test@97f64bc080b78daca8fb3ece49de448aaac83429 # 1.1.0
+        with:
+          working-directory: actions/vm/destroy
+          command: test:ci
+          coverage: ""
+  deletion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [lima, qemu]
+    steps:
+      - name: Arrange - Checkout destruction fixtures
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Arrange - Prepare a disposable deletion target
+        id: fixture
+        uses: $/tests/fixture/prepare-vm
+        with:
+          backend: ${{ matrix.backend }}
+      - name: Arrange - Create the VM to delete
+        id: vm
+        uses: $/actions/vm/create
+        with:
+          backend: ${{ matrix.backend }}
+          vm-config: ${{ steps.fixture.outputs.vm-config }}
+          startup-timeout-minutes: 5
+      - name: Arrange - Prepare unrelated synthetic data
+        env:
+          UNMANAGED: ${{ runner.temp }}/unmanaged-vm
+        run: |
+          mkdir "$UNMANAGED"
+          printf 'preserve this fixture\n' > "$UNMANAGED/marker"
+      - name: Act - Reject an unmanaged directory
+        id: unmanaged
+        continue-on-error: true
+        uses: $/actions/vm/destroy
+        with:
+          vm: ${{ runner.temp }}/unmanaged-vm
+      - name: Assert - Check unmanaged data is preserved
+        if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REJECTED: ${{ steps.unmanaged.outcome }}
+          UNMANAGED: ${{ runner.temp }}/unmanaged-vm
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            assert.equal(process.env.REJECTED, 'failure');
+            assert.equal(fs.readFileSync(`${process.env.UNMANAGED}/marker`, 'utf8'), 'preserve this fixture\n');
+
+      - name: Act - Delete the running VM
+        id: destroy
+        if: ${{ always() && steps.vm.outputs.vm != '' }}
+        continue-on-error: true
+        uses: $/actions/vm/destroy
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+      - name: Assert - Verify deletion before retrying
+        if: ${{ always() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DELETION_OUTCOME: ${{ steps.destroy.outcome }}
+          VM_DIRECTORY: ${{ steps.vm.outputs.vm }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            assert.equal(process.env.DELETION_OUTCOME, 'success');
+            assert.ok(process.env.VM_DIRECTORY);
+            assert.equal(fs.existsSync(process.env.VM_DIRECTORY), false);
+      - name: Act - Repeat destruction of the same reference
+        id: repeated
+        if: ${{ always() && steps.vm.outputs.vm != '' }}
+        uses: $/actions/vm/destroy
+        with:
+          vm: ${{ steps.vm.outputs.vm }}
+      - name: Assert - Check repeated destruction succeeds
+        if: ${{ always() && steps.vm.outcome == 'success' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REPEATED_OUTCOME: ${{ steps.repeated.outcome }}
+        with:
+          script: |
+            require('node:assert/strict').equal(process.env.REPEATED_OUTCOME, 'success');
+      - name: Cleanup - Remove destruction fixture inputs
+        if: ${{ always() }}
+        env:
+          UNMANAGED: ${{ runner.temp }}/unmanaged-vm
+        run: rm -rf .cache/qemu-fixture "$UNMANAGED"

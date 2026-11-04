@@ -7,17 +7,6 @@ on:
 permissions: {}
 
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Run unit tests
-        run: make test
   linter:
     uses: hoverkraft-tech/ci-github-common/.github/workflows/linter.yml@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
     with:
@@ -31,26 +20,29 @@ jobs:
       pull-requests: write
       security-events: write
       statuses: write
-  vm:
+  test-action-vm-create:
     permissions:
       contents: read
-      pull-requests: write
-    uses: $/.github/workflows/__test-actions-vm.yml
-  ansible:
+    uses: $/.github/workflows/__test-actions-vm-create.yml
+  test-action-vm-test:
     permissions:
+      actions: read
       contents: read
       pull-requests: write
-    uses: $/.github/workflows/__test-actions-ansible.yml
-  checks:
-    if: ${{ always() }}
-    needs: [tests, linter, vm, ansible]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require all checks
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const results = Object.values(JSON.parse(process.env.RESULTS));
-            if (!results.every(job => job.result === 'success')) core.setFailed('A required check did not succeed');
+    uses: $/.github/workflows/__test-actions-vm-test.yml
+  test-action-vm-destroy:
+    permissions:
+      contents: read
+    uses: $/.github/workflows/__test-actions-vm-destroy.yml
+  test-action-ansible-test:
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    uses: $/.github/workflows/__test-actions-ansible-test.yml
+  test-action-ansible-test-molecule:
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    uses: $/.github/workflows/__test-actions-ansible-test-molecule.yml

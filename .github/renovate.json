@@ -1,7 +1,13 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:recommended"],
-	"enabledManagers": ["custom.regex"],
+	"enabledManagers": ["custom.regex", "nodenv"],
+	"packageRules": [
+		{
+			"matchManagers": ["nodenv"],
+			"groupName": "Node.js runtimes"
+		}
+	],
 	"customManagers": [
 		{
 			"customType": "regex",
@@ -15,9 +21,23 @@
 			"customType": "regex",
 			"managerFilePatterns": ["/^Makefile$/"],
 			"matchStrings": [
-				"--package=(?<depName>@ci-dokumentor/cli)@(?<currentValue>\\S+)"
+				"(?<depName>ghcr\\.io/hoverkraft-tech/ci-dokumentor/cli):(?<currentValue>\\S+)"
 			],
-			"datasourceTemplate": "npm"
+			"datasourceTemplate": "docker",
+			"versioningTemplate": "docker"
+		},
+		{
+			"customType": "regex",
+			"description": "Update the Goss release and Linux x86-64 archive checksum together",
+			"managerFilePatterns": ["/^actions/vm/test/goss\\.json$/"],
+			"matchStrings": [
+				"\"version\":\\s*\"(?<version>[^\"]+)\",\\s*\"sha256\":\\s*\"(?<currentDigest>[a-f0-9]{64})\""
+			],
+			"depNameTemplate": "goss-org/goss",
+			"datasourceTemplate": "github-release-attachments",
+			"versioningTemplate": "semver",
+			"currentValueTemplate": "v{{{version}}}",
+			"autoReplaceStringTemplate": "\"version\": \"{{{replace '^v' '' newValue}}}\",\n\t\"sha256\": \"{{{newDigest}}}\""
 		}
 	]
 }

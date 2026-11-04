@@ -1,0 +1,42 @@
+---
+name: Prepare VM test fixture
+description: Prepare synthetic backend configuration for internal action tests without starting a VM.
+inputs:
+  backend:
+    description: Backend exercised by the calling test.
+    required: true
+outputs:
+  vm-config:
+    description: Checkout-relative configuration for successful startup.
+    value: ${{ steps.config.outputs.valid }}
+  invalid-config:
+    description: Checkout-relative configuration that fails during startup.
+    value: ${{ steps.config.outputs.invalid }}
+runs:
+  using: composite
+  steps:
+    - name: Prepare verified QEMU image
+      if: inputs.backend == 'qemu'
+      shell: bash
+      run: |
+        mkdir -p .cache/qemu-fixture
+        curl --fail --location --retry 3 https://cloud-images.ubuntu.com/releases/resolute/release-20261016/ubuntu-26.04-server-cloudimg-amd64.img -o .cache/qemu-fixture/image.qcow2
+        echo '5645d0318ad21f643ebb1ac4567514620e9893380b07b0201fda163baa5b7eb5  .cache/qemu-fixture/image.qcow2' | sha256sum --check
+        sudo apt-get update -qq
+        sudo apt-get install --no-install-recommends -y cloud-image-utils
+    - name: Select synthetic fixture configurations
+      id: config
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        BACKEND: ${{ inputs.backend }}
+        FIXTURE_PATH: ${{ github.action_path }}
+      with:
+        script: |
+          const qemu = process.env.BACKEND === 'qemu';
+          if (!qemu && process.env.BACKEND !== 'lima') throw new Error('Unsupported fixture backend');
+          if (qemu) await require(`${process.env.FIXTURE_PATH}/qemu.cjs`)({ exec, io });
+          core.setOutput('valid', qemu ? '.cache/qemu-fixture/vm.json' : 'tests/fixture/lima.yml');
+          core.setOutput('invalid', qemu ? '.cache/qemu-fixture/invalid.json' : 'tests/fixture/unbootable.yml');
+    - name: Remove the consumer Makefile
+      shell: bash
+      run: rm Makefile
