@@ -1,11 +1,11 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { suite, test } = require("node:test");
-const glob = require("@actions/glob");
-const { AnsibleInputs } = require("../inputs.cjs");
-const { AnsibleReports } = require("../reports.cjs");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { suite, test } from "node:test";
+import * as glob from "@actions/glob";
+import { AnsibleInputs } from "../inputs.cjs";
+import { AnsibleReports } from "../reports.cjs";
 
 function fixture(t) {
 	const root = fs.mkdtempSync(

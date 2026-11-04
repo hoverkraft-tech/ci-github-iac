@@ -1,20 +1,20 @@
-const exec = require("@actions/exec");
-const io = require("@actions/io");
+import * as execToolkit from "@actions/exec";
+import * as io from "@actions/io";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { suite, test } from "node:test";
+import { VirtualMachine } from "../../_internal/runtime.cjs";
+import { limaFixture, qemuFixture } from "../../../../tests/helpers/vm.cjs";
+
+// Copy the ESM namespace so tests can mock the injected helper.
+const exec = { ...execToolkit };
 const helpers = { exec, io };
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const { suite, test } = require("node:test");
-const { VirtualMachine } = require("../../_internal/runtime.cjs");
-const {
-	limaFixture,
-	qemuFixture,
-} = require("../../../../tests/helpers/vm.cjs");
 
 suite("vm/destroy", () => {
 	test("shared, unmanaged and symlinked runtimes are rejected", async (t) => {
 		// Arrange
-		const { root, vm } = limaFixture(t);
+		const { root, vm } = limaFixture(t, { exec, io });
 		for (const directory of ["", root, "/tmp/not-owned"]) {
 			// Act
 			const destroy = () => new VirtualMachine(directory, helpers).destroy();
@@ -46,7 +46,7 @@ suite("vm/destroy", () => {
 
 	test("an empty runtime can be destroyed without installed Lima", async (t) => {
 		// Arrange
-		const { vm } = limaFixture(t);
+		const { vm } = limaFixture(t, { exec, io });
 		const command = t.mock.method(exec, "exec");
 
 		// Act
@@ -59,7 +59,7 @@ suite("vm/destroy", () => {
 
 	test("failed destruction preserves recovery access", async (t) => {
 		// Arrange
-		const { vm } = limaFixture(t);
+		const { vm } = limaFixture(t, { exec, io });
 		fs.writeFileSync(vm.sshConfig, "synthetic recovery configuration");
 		t.mock.method(VirtualMachine.prototype, "exists", () => true);
 		t.mock.method(exec, "exec", () => 0);
@@ -76,7 +76,7 @@ suite("vm/destroy", () => {
 	});
 	test("QEMU runtime selection rejects unmanaged paths and unsafe ownership", async (t) => {
 		// Arrange
-		const { vm, root } = qemuFixture(t);
+		const { vm, root } = qemuFixture(t, { exec, io });
 
 		// Act
 		const selected = new VirtualMachine(vm.home, helpers);
@@ -110,7 +110,7 @@ suite("vm/destroy", () => {
 
 	test("cleanup never signals another process or deletes its recovery files", async (t) => {
 		// Arrange
-		const { vm } = qemuFixture(t);
+		const { vm } = qemuFixture(t, { exec, io });
 		fs.writeFileSync(path.join(vm.home, "pid"), String(process.pid));
 		const kill = t.mock.method(process, "kill", () =>
 			assert.fail("Must not signal an unrelated process"),

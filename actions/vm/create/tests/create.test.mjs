@@ -1,22 +1,24 @@
-const exec = require("@actions/exec");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const { suite, test } = require("node:test");
-const { GuestCreation } = require("../creation.cjs");
-const { run } = require("../../_internal/command.cjs");
-const {
-	limaFixture,
-	qemuFixture,
-} = require("../../../../tests/helpers/vm.cjs");
+import * as io from "@actions/io";
+import { setTimeout as delay } from "node:timers/promises";
+import * as execToolkit from "@actions/exec";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { suite, test } from "node:test";
+import { GuestCreation } from "../creation.cjs";
+import { run } from "../../_internal/command.cjs";
+import { limaFixture, qemuFixture } from "../../../../tests/helpers/vm.cjs";
+
+// Copy the ESM namespace so tests can mock the injected helper.
+const exec = { ...execToolkit };
 
 suite("vm/create", () => {
 	test("configuration must be a checkout file", async (t) => {
 		// Arrange
-		const { root } = limaFixture(t);
+		const { root } = limaFixture(t, { exec, io });
 		fs.symlinkSync(
 			fs.realpathSync(
-				path.join(__dirname, "../../../../tests/fixture/lima.yml"),
+				path.join(import.meta.dirname, "../../../../tests/fixture/lima.yml"),
 			),
 			path.join(root, "external.yml"),
 		);
@@ -39,7 +41,7 @@ suite("vm/create", () => {
 
 	test("custom startup budgets retain a bounded subprocess deadline", async (t) => {
 		// Arrange
-		const { vm } = limaFixture(t);
+		const { vm } = limaFixture(t, { exec, io });
 		const spawn = t.mock.method(exec, "exec", (_program, _args, options) => {
 			options.listeners.stdout(Buffer.from("Host fixture\n"));
 			return 0;
@@ -60,7 +62,7 @@ suite("vm/create", () => {
 
 	test("invalid startup budgets are rejected", async (t) => {
 		// Arrange
-		limaFixture(t);
+		limaFixture(t, { exec, io });
 		for (const timeout of ["", "0", "-1", "41", "1.5", "unbounded"]) {
 			// Act
 			const create = () => new GuestCreation("guest.yml", timeout);
@@ -72,7 +74,7 @@ suite("vm/create", () => {
 
 	test("repeated creation refuses to reuse or delete a running VM", async (t) => {
 		// Arrange
-		const { vm } = limaFixture(t);
+		const { vm } = limaFixture(t, { exec, io });
 		t.mock.method(vm, "exists", () => true);
 		const command = t.mock.method(exec, "exec");
 
@@ -86,7 +88,7 @@ suite("vm/create", () => {
 
 	test("startup does not recreate a released runtime", async (t) => {
 		// Arrange
-		const { vm } = limaFixture(t);
+		const { vm } = limaFixture(t, { exec, io });
 		await vm.destroy();
 		const spawn = t.mock.method(exec, "exec");
 
@@ -101,7 +103,7 @@ suite("vm/create", () => {
 
 	test("failed creation rolls back its partial guest", async (t) => {
 		// Arrange
-		const { vm } = limaFixture(t);
+		const { vm } = limaFixture(t, { exec, io });
 		const presence = [false, true, false];
 		t.mock.method(vm, "exists", () => presence.shift());
 		const command = t.mock.method(exec, "exec", (_program, args) => {
@@ -124,7 +126,7 @@ suite("vm/create", () => {
 
 	test("failed rollback preserves recovery files without exposing command output", async (t) => {
 		// Arrange
-		const { vm } = limaFixture(t);
+		const { vm } = limaFixture(t, { exec, io });
 		const presence = [false, true];
 		fs.writeFileSync(vm.sshConfig, "synthetic recovery configuration");
 		t.mock.method(vm, "exists", () => presence.shift());
@@ -192,9 +194,8 @@ suite("vm/create", () => {
 
 	test("command deadlines terminate child processes before they can modify files", async (t) => {
 		// Arrange
-		const { root } = limaFixture(t);
+		const { root } = limaFixture(t, { exec, io });
 		const marker = path.join(root, "unexpected-child-output");
-		const { setTimeout: delay } = require("node:timers/promises");
 
 		// Act
 		const execute = () =>
@@ -220,7 +221,7 @@ suite("vm/create", () => {
 
 	test("QEMU configuration requires bounded resources, private media and matching network addresses", async (t) => {
 		// Arrange
-		const { creation, config } = qemuFixture(t);
+		const { creation, config } = qemuFixture(t, { exec, io });
 
 		// Act
 		const valid = creation();
@@ -252,7 +253,7 @@ suite("vm/create", () => {
 
 	test("failed QEMU setup rolls back an allocated runtime", async (t) => {
 		// Arrange
-		const { creation, vm } = qemuFixture(t);
+		const { creation, vm } = qemuFixture(t, { exec, io });
 		const operation = creation();
 		t.mock.method(operation, "port", async () => {
 			throw new Error("synthetic port allocation failure");
@@ -268,7 +269,7 @@ suite("vm/create", () => {
 
 	test("installer power-off precedes disk boot and SSH readiness", async (t) => {
 		// Arrange
-		const { creation, vm } = qemuFixture(t);
+		const { creation, vm } = qemuFixture(t, { exec, io });
 		const operation = creation();
 		t.mock.method(operation, "port", async () => 2222);
 		t.mock.method(operation, "prepare", () => {});
