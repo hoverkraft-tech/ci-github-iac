@@ -75,7 +75,7 @@ See the [lifecycle example](../create/README.md#compose-the-vm-actions).
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@5c4b7307d7a2c58a01a3b62607cebde65f96b0a2 # 0.2.0
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@89e3bf93adc94b592188e714f61d4abc391aab46 # 1.0.0
   with:
     # VM reference returned by vm/create in the same job; works with either backend.
     # This input is required.

@@ -15,10 +15,23 @@ class PublishedReports {
 			.filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix))
 			.map((entry) => path.join(process.env.RUNNER_TEMP, entry.name));
 		assert.equal(directories.length, expectedCount);
-		const artifacts = await this.github.paginate(
-			this.github.rest.actions.listWorkflowRunArtifacts,
-			{ ...this.context.repo, run_id: this.context.runId, per_page: 100 },
-		);
+		let artifacts = [];
+		// Upload completion can precede visibility in GitHub's artifact list.
+		const deadline = Date.now() + 60_000;
+		while (true) {
+			artifacts = await this.github.paginate(
+				this.github.rest.actions.listWorkflowRunArtifacts,
+				{ ...this.context.repo, run_id: this.context.runId, per_page: 100 },
+			);
+			if (
+				directories.every((directory) =>
+					artifacts.some((item) => item.name === path.basename(directory)),
+				) ||
+				Date.now() >= deadline
+			)
+				break;
+			await new Promise((resolve) => setTimeout(resolve, 2_000));
+		}
 		return directories.map((directory) => {
 			assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
 			const artifact = artifacts.find(
