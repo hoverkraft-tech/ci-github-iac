@@ -68,6 +68,9 @@ use synthetic expectations and never match or print credentials. Infrastructure
 assertions produce test results, not application code coverage.
 
 See the [lifecycle example](../create/README.md#compose-the-vm-actions).
+For consolidated comments, set `comment: false` and call the common `ci-reports`
+workflow after all test jobs. Native report artifacts use the `ci-reports-` prefix
+and the current run attempt, so earlier attempts cannot leak stale results.
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -95,6 +98,10 @@ See the [lifecycle example](../create/README.md#compose-the-vm-actions).
     # Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.
     # Default: `VM test results`
     report-name: VM test results
+
+    # Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.
+    # Default: `true`
+    comment: "true"
 ```
 
 <!-- usage:end -->
@@ -102,13 +109,14 @@ See the [lifecycle example](../create/README.md#compose-the-vm-actions).
 
 ## Inputs
 
-| **Input**                  | **Description**                                                                                  | **Required** | **Default**       |
-| -------------------------- | ------------------------------------------------------------------------------------------------ | ------------ | ----------------- |
-| **`vm`**                   | VM reference returned by vm/create in the same job; works with either backend.                   | **true**     | -                 |
-| **`goss-file`**            | Required checkout-relative Goss suite, including any referenced Goss files.                      | **true**     | -                 |
-| **`goss-vars`**            | Optional checkout-relative JSON or YAML variables file. Use values suitable for public reports.  | **false**    | -                 |
-| **`test-timeout-minutes`** | Combined Goss setup and execution timeout, from 1 to 40 minutes.                                 | **false**    | `10`              |
-| **`report-name`**          | Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario. | **false**    | `VM test results` |
+| **Input**                  | **Description**                                                                                                                             | **Required** | **Default**       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------- |
+| **`vm`**                   | VM reference returned by vm/create in the same job; works with either backend.                                                              | **true**     | -                 |
+| **`goss-file`**            | Required checkout-relative Goss suite, including any referenced Goss files.                                                                 | **true**     | -                 |
+| **`goss-vars`**            | Optional checkout-relative JSON or YAML variables file. Use values suitable for public reports.                                             | **false**    | -                 |
+| **`test-timeout-minutes`** | Combined Goss setup and execution timeout, from 1 to 40 minutes.                                                                            | **false**    | `10`              |
+| **`report-name`**          | Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.                                            | **false**    | `VM test results` |
+| **`comment`**              | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled. | **false**    | `true`            |
 
 <!-- inputs:end -->
 <!-- secrets:start -->

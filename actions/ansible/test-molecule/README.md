@@ -91,6 +91,9 @@ Grant `pull-requests: write` for comments; fork and Dependabot comments are skip
 Never run untrusted tests through `pull_request_target`. Choose distinct report
 names for separate scenarios. Reports are uploaded with a unique artifact name
 and seven-day retention, including after parsing or commenting failures.
+For consolidated comments, set `comment: false` and call the common `ci-reports`
+workflow after all test jobs. Native report artifacts use the `ci-reports-` prefix
+and the current run attempt, so earlier attempts cannot leak stale results.
 
 <!-- overview:end -->
 <!-- usage:start -->
@@ -118,6 +121,10 @@ and seven-day retention, including after parsing or commenting failures.
     # Stable summary and PR comment title, distinct for each test step or matrix entry.
     # Default: `Molecule test results`
     report-name: Molecule test results
+
+    # Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.
+    # Default: `true`
+    comment: "true"
 ```
 
 <!-- usage:end -->
@@ -125,13 +132,14 @@ and seven-day retention, including after parsing or commenting failures.
 
 ## Inputs
 
-| **Input**                  | **Description**                                                                                                          | **Required** | **Default**             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------ | ----------------------- |
-| **`molecule-scenario`**    | Checkout-relative directory containing molecule.yml. The scenario defines its inventory, playbooks and test sequence.    | **true**     | -                       |
-| **`ansible-requirements`** | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                               | **true**     | -                       |
-| **`ansible-config`**       | Optional checkout-relative ansible.cfg for scenario execution and collection search paths.                               | **false**    | -                       |
-| **`test-timeout-minutes`** | Native test sequence deadline, from 1 to 40 minutes. Interrupted runs allow two additional minutes for scenario cleanup. | **false**    | `20`                    |
-| **`report-name`**          | Stable summary and PR comment title, distinct for each test step or matrix entry.                                        | **false**    | `Molecule test results` |
+| **Input**                  | **Description**                                                                                                                             | **Required** | **Default**             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------------- |
+| **`molecule-scenario`**    | Checkout-relative directory containing molecule.yml. The scenario defines its inventory, playbooks and test sequence.                       | **true**     | -                       |
+| **`ansible-requirements`** | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                  | **true**     | -                       |
+| **`ansible-config`**       | Optional checkout-relative ansible.cfg for scenario execution and collection search paths.                                                  | **false**    | -                       |
+| **`test-timeout-minutes`** | Native test sequence deadline, from 1 to 40 minutes. Interrupted runs allow two additional minutes for scenario cleanup.                    | **false**    | `20`                    |
+| **`report-name`**          | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                           | **false**    | `Molecule test results` |
+| **`comment`**              | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled. | **false**    | `true`                  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
