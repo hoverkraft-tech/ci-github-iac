@@ -1,5 +1,8 @@
 # Contributing
 
+Use the [common commit process](https://github.com/hoverkraft-tech/ci-github-common/blob/9e235e87e1da898e33689b346590dfc69b45b0a6/docs/usage/commits.md)
+for commit messages, PR titles and dependency updates.
+
 ## Make and workflow conventions
 
 Follow the [Hoverkraft Makefile](https://github.com/hoverkraft-tech/ci-github-container/blob/main/Makefile)
