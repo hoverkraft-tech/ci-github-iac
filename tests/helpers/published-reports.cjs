@@ -72,7 +72,7 @@ class PublishedReports {
 		});
 	}
 
-	async comment(title, expected = true) {
+	async readComments(title) {
 		const pullRequest = this.context.payload.pull_request;
 		if (
 			this.context.eventName !== "pull_request" ||
@@ -88,19 +88,22 @@ class PublishedReports {
 				per_page: 100,
 			},
 		);
-		const comment = comments.find(
-			(item) =>
-				item.user.login === "github-actions[bot]" &&
-				item.body.startsWith(`${title}\n`),
-		);
-		assert.equal(
-			Boolean(comment),
-			expected,
-			`Unexpected comment presence: ${title}`,
-		);
-		if (!comment) return null;
-		assert.equal(comment.body.includes("synthetic-private-output"), false);
-		return comment.body;
+		return comments
+			.filter(
+				(item) =>
+					item.user.login === "github-actions[bot]" &&
+					item.body.startsWith(`${title}\n`),
+			)
+			.map(({ id, body, updated_at }) => ({ id, body, updated_at }));
+	}
+
+	async comment(title) {
+		const comments = await this.readComments(title);
+		if (comments === null) return null;
+		assert.ok(comments.length > 0, `Missing comment: ${title}`);
+		for (const comment of comments)
+			assert.equal(comment.body.includes("synthetic-private-output"), false);
+		return comments[0].body;
 	}
 }
 

@@ -1,12 +1,18 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
+    commit-message:
+      prefix: build
+      include: scope
     directory: /
     cooldown:
       default-days: 7
     schedule:
       interval: weekly
   - package-ecosystem: docker
+    commit-message:
+      prefix: build
+      include: scope
     directory: /
     cooldown:
       default-days: 7
@@ -16,6 +22,9 @@ updates:
       docker-dependencies:
         patterns: ["*"]
   - package-ecosystem: npm
+    commit-message:
+      prefix: build
+      include: scope
     directories:
       - /actions/ansible/test
       - /actions/ansible/test-molecule
@@ -30,6 +39,9 @@ updates:
       github-script-test-helpers:
         patterns: ["@actions/*"]
   - package-ecosystem: pip
+    commit-message:
+      prefix: build
+      include: scope
     directories:
       - /tests/fixture/ansible
       - /actions/ansible/test-molecule
