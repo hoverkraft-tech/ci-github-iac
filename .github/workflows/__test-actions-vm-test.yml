@@ -65,6 +65,17 @@ jobs:
             sudo -n usermod -aG iac-goss "$(id -un)"
             ! id -nG | grep -qw iac-goss
           '
+      - name: Arrange - Capture existing comments when publication is disabled
+        if: ${{ matrix.backend == 'lima' }}
+        id: comment-before
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REPORT_NAME: Goss - ${{ matrix.backend }} - valid
+        with:
+          script: |
+            const { PublishedReports } = require('./tests/helpers/published-reports.cjs');
+            const published = new PublishedReports(github, context);
+            core.setOutput('comments', JSON.stringify(await published.readComments(process.env.REPORT_NAME)));
       - name: Act - Validate valid suite
         if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
         id: valid
@@ -84,6 +95,7 @@ jobs:
           OUTCOME: ${{ steps.valid.outcome }}
           REPORT_NAME: Goss - ${{ matrix.backend }} - valid
           EXPECT_COMMENT: ${{ matrix.backend != 'lima' }}
+          COMMENTS_BEFORE: ${{ steps.comment-before.outputs.comments }}
         with:
           script: |
             const assert = require('node:assert/strict');
@@ -92,7 +104,15 @@ jobs:
             assert.equal(process.env.OUTCOME, 'success');
             const reports = await published.read('vm-test-', 1);
             assert.ok(reports.some(report => report.text.includes('goss-execution')));
-            await published.comment(process.env.REPORT_NAME, process.env.EXPECT_COMMENT === 'true');
+            if (process.env.EXPECT_COMMENT === 'true') {
+              await published.comment(process.env.REPORT_NAME);
+            } else {
+              assert.deepEqual(
+                await published.readComments(process.env.REPORT_NAME),
+                JSON.parse(process.env.COMMENTS_BEFORE),
+                'Disabled publication must leave existing comments unchanged',
+              );
+            }
       - name: Act - Validate invalid suite
         if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
         id: invalid
