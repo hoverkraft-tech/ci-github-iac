@@ -25,7 +25,12 @@ class PublishedReports {
 			);
 			if (
 				directories.every((directory) =>
-					artifacts.some((item) => item.name === path.basename(directory)),
+					artifacts.some(
+						(item) =>
+							item.name.startsWith(
+								`ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-`,
+							) && item.name.endsWith(`-${path.basename(directory)}`),
+					),
 				) ||
 				Date.now() >= deadline
 			)
@@ -35,7 +40,10 @@ class PublishedReports {
 		return directories.map((directory) => {
 			assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
 			const artifact = artifacts.find(
-				(item) => item.name === path.basename(directory),
+				(item) =>
+					item.name.startsWith(
+						`ci-reports-${process.env.GITHUB_RUN_ATTEMPT}-`,
+					) && item.name.endsWith(`-${path.basename(directory)}`),
 			);
 			assert.ok(
 				artifact,
@@ -64,13 +72,12 @@ class PublishedReports {
 		});
 	}
 
-	async comment(title) {
+	async comment(title, expected = true) {
 		const pullRequest = this.context.payload.pull_request;
 		if (
 			this.context.eventName !== "pull_request" ||
 			pullRequest.head.repo.full_name !==
-				`${this.context.repo.owner}/${this.context.repo.repo}` ||
-			this.context.actor === "dependabot[bot]"
+				`${this.context.repo.owner}/${this.context.repo.repo}`
 		)
 			return null;
 		const comments = await this.github.paginate(
@@ -86,7 +93,12 @@ class PublishedReports {
 				item.user.login === "github-actions[bot]" &&
 				item.body.startsWith(`${title}\n`),
 		);
-		assert.ok(comment, `Missing report comment: ${title}`);
+		assert.equal(
+			Boolean(comment),
+			expected,
+			`Unexpected comment presence: ${title}`,
+		);
+		if (!comment) return null;
 		assert.equal(comment.body.includes("synthetic-private-output"), false);
 		return comment.body;
 	}

@@ -46,9 +46,12 @@
 # errors. Missing reports fail the action. Failed tests remain failures. No custom
 # test runner or Docker lifecycle is maintained here.
 #
-# Grant `pull-requests: write` for comments. Fork and Dependabot comments are skipped.
+# Grant `pull-requests: write` for comments. Fork PR comments are skipped.
 # Never run untrusted tests through `pull_request_target`. Use distinct report names
 # for matrix entries.
+# For consolidated comments, set `comment: false` and call the common `ci-reports`
+# workflow after all test jobs. Native report artifacts use the `ci-reports-` prefix
+# and the current run attempt, so earlier attempts cannot leak stale results.
 ---
 name: Ansible - Test
 description: Run Ansible test playbooks and collection sanity with native reports, PR comments and artifacts.
@@ -78,6 +81,9 @@ inputs:
   report-name:
     description: Stable summary and PR comment title, distinct for each test step or matrix entry.
     default: Ansible test results
+  comment:
+    description: Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.
+    default: "true"
 runs:
   using: composite
   steps:
@@ -157,7 +163,7 @@ runs:
     - name: Parse Ansible reports
       if: ${{ always() && steps.collect.outputs.report-files != '' }}
       id: parse
-      uses: hoverkraft-tech/ci-github-common/actions/parse-ci-reports@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
+      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
       with:
         report-name: ${{ inputs.report-name }}
         report-paths: ${{ steps.collect.outputs.report-files }}
@@ -166,7 +172,7 @@ runs:
 
     - name: Add Ansible PR comment
       if: >-
-        ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.parse.outputs.markdown != '' }}
+        ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.parse.outputs.markdown != '' }}
       uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
       with:
         title: ${{ inputs.report-name }}
@@ -178,7 +184,7 @@ runs:
       id: upload
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: ${{ steps.inputs.outputs.id }}
+        name: ci-reports-${{ github.run_attempt }}-${{ github.job }}-${{ steps.inputs.outputs.id }}
         path: ${{ steps.collect.outputs.report-files }}
         if-no-files-found: error
         retention-days: 7

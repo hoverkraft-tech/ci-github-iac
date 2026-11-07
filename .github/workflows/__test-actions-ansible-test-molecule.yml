@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       # jscpd:ignore-end
       - name: Act - Run ansible/test-molecule unit tests
-        uses: hoverkraft-tech/ci-github-nodejs/actions/test@97f64bc080b78daca8fb3ece49de448aaac83429 # 1.1.0
+        uses: hoverkraft-tech/ci-github-nodejs/actions/test@02a04ad25ceaacdf3b7200e45fb7fec07fadf4fa # 2.1.0
         with:
           working-directory: actions/ansible/test-molecule
           command: test:ci
