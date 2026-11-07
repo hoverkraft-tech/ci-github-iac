@@ -42,6 +42,9 @@
 # assertions produce test results, not application code coverage.
 #
 # See the [lifecycle example](../create/README.md#compose-the-vm-actions).
+# For consolidated comments, set `comment: false` and call the common `ci-reports`
+# workflow after all test jobs. Native report artifacts use the `ci-reports-` prefix
+# and the current run attempt, so earlier attempts cannot leak stale results.
 ---
 name: VM - Test
 description: Validate VM state with Goss, publish summaries and PR comments, and upload JUnit results.
@@ -65,6 +68,9 @@ inputs:
   report-name:
     description: Summary and PR comment title. Use a distinct stable name for each test step and matrix scenario.
     default: VM test results
+  comment:
+    description: Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.
+    default: "true"
 runs:
   using: composite
   steps:
@@ -113,7 +119,7 @@ runs:
 
     - name: Add test PR comment
       if: >-
-        ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.parse-test-reports.outputs.markdown != '' }}
+        ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.parse-test-reports.outputs.markdown != '' }}
       uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@44f6108cef0e9884ea7735f3d62932c2310745d4 # 0.39.1
       with:
         title: ${{ inputs.report-name }}
@@ -125,7 +131,7 @@ runs:
       id: upload
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: ${{ steps.test.outputs.id }}
+        name: ci-reports-${{ github.run_attempt }}-${{ github.job }}-${{ steps.test.outputs.id }}
         path: |
           ${{ steps.test.outputs.report }}
           ${{ steps.test.outputs.report-files }}

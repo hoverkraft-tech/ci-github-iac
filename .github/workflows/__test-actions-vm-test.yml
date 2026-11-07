@@ -72,6 +72,7 @@ jobs:
         uses: $/actions/vm/test
         with:
           vm: ${{ steps.vm.outputs.vm }}
+          comment: ${{ matrix.backend != 'lima' }}
           goss-file: tests/fixture/goss/valid.yaml
           goss-vars: tests/fixture/goss/vars.json
           test-timeout-minutes: 1
@@ -82,6 +83,7 @@ jobs:
         env:
           OUTCOME: ${{ steps.valid.outcome }}
           REPORT_NAME: Goss - ${{ matrix.backend }} - valid
+          EXPECT_COMMENT: ${{ matrix.backend != 'lima' }}
         with:
           script: |
             const assert = require('node:assert/strict');
@@ -90,7 +92,7 @@ jobs:
             assert.equal(process.env.OUTCOME, 'success');
             const reports = await published.read('vm-test-', 1);
             assert.ok(reports.some(report => report.text.includes('goss-execution')));
-            await published.comment(process.env.REPORT_NAME);
+            await published.comment(process.env.REPORT_NAME, process.env.EXPECT_COMMENT === 'true');
       - name: Act - Validate invalid suite
         if: ${{ !cancelled() && steps.vm.outcome == 'success' }}
         id: invalid
