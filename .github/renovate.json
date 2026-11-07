@@ -1,4 +1,6 @@
 {
+	"semanticCommits": "enabled",
+	"semanticCommitType": "build",
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:recommended"],
 	"enabledManagers": ["custom.regex", "nodenv"],
