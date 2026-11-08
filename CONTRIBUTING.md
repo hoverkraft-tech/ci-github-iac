@@ -18,7 +18,7 @@ only for lint commands; unknown standalone targets still fail. `make ci` runs
 `lint-fix` and unit tests locally. VM integration tests run in hosted action-test workflows.
 
 Internal `__main-ci.yml` and `__pull-request-ci.yml` call `__shared-ci.yml`.
-Main supports pushes and manual runs; PR CI also supports merge queues. Both
+Main supports branch and tag pushes and manual runs; PR CI also supports merge queues. Both
 cancel superseded runs for the same workflow and ref. Each public action has a
 dedicated test workflow, with backend and scenario variants inside it. Other actions
 provide fixture setup or cleanup; assertions verify the action named by the workflow.
@@ -131,6 +131,33 @@ Use Conventional Commits and a reviewed pull request. Publish semantic versions
 only after CI and consumer validation pass: major for incompatible contracts,
 minor for compatible features, patch for fixes. Consumers pin full commit SHAs;
 do not move release tags.
+
+`__prepare-release.yml` applies the shared Conventional Commit release labels on
+pull requests and prepares release configuration on main pushes.
+`__release.yml` runs every Monday at 08:25 UTC and supports manual dispatch.
+It runs the complete shared CI on the default branch, then plans and publishes a
+release for that run's exact commit using `ci-github-publish`. Runs from other
+branches or tags are skipped. No relevant changes means no publication; the manual
+`force` input bypasses only that no-changes guard, not CI or existing-tag checks.
+
+To release on demand, run `Internal - Release` from the Actions tab with `main`
+selected, or use:
+
+```sh
+gh workflow run __release.yml --ref main
+```
+
+The release job authenticates with `CI_BOT_APP_CLIENT_ID` and
+`CI_BOT_APP_PRIVATE_KEY`; `OPENAI_API_KEY` supplies release-summary generation.
+These values can be provided through organization variables and secrets. The app needs repository
+contents write and pull request read permissions for publication. Its token allows
+the resulting tag push to trigger main CI.
+
+After successful main CI, the shared `release-actions` workflow regenerates action
+documentation and opens or updates its documentation PR, using squash merging.
+Tag pushes and manual main CI runs refresh all action references. Internal `__`
+workflows are excluded from generation. Documentation automation uses the same app,
+with contents, pull request and workflow write permissions.
 
 Renovate updates the Goss version and archive SHA-256 together using the
 `github-release-attachments` datasource. Review the Ubuntu image URL and SHA-256
