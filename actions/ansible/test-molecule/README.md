@@ -101,7 +101,7 @@ and the current run attempt, so earlier attempts cannot leak stale results.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test-molecule@89e3bf93adc94b592188e714f61d4abc391aab46 # 1.0.0
+- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test-molecule@2c1945afe85bb687c15da83e332b4c52aabae290 # 1.1.0
   with:
     # Checkout-relative directory containing molecule.yml. The scenario defines its inventory, playbooks and test sequence.
     # This input is required.
