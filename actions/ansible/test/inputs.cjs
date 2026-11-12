@@ -33,6 +33,13 @@ class AnsibleInputs {
 		const playbook = this.env.ANSIBLE_TEST_PLAYBOOK?.trim();
 		const collection = this.env.ANSIBLE_COLLECTION?.trim();
 		const targetPython = this.env.ANSIBLE_TARGET_PYTHON_VERSION?.trim() || "";
+		const sanityImage = this.env.ANSIBLE_SANITY_IMAGE?.trim() || "";
+		if (sanityImage && (!collection || !targetPython)) {
+			throw new Error(
+				"sanity-image requires a collection and target-python-version.",
+			);
+		}
+		this.core.setOutput("sanity-image", sanityImage);
 		if (targetPython && (!collection || !/^3\.[0-9]+$/.test(targetPython))) {
 			throw new Error(
 				"target-python-version requires a collection and a Python 3 major.minor version.",

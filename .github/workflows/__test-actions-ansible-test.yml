@@ -35,17 +35,24 @@ jobs:
       matrix:
         mode: [playbook, sanity]
         result: [success, failure]
+        include:
+          - mode: sanity
+            # Rebuilt upstream image: https://github.com/ansible/ansible/pull/87886
+            sanity-image: quay.io/ansible/default-test-container:v2.22-9@sha256:9fabb237384a4faca9dc6bdf3647a224eacf318768986677118a506b4b35f1d6
     steps:
       - name: Arrange - Checkout fixture
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Arrange - Prepare selected scenario without a consumer Makefile
+        id: fixture
         env:
           MODE: ${{ matrix.mode }}
           RESULT: ${{ matrix.result }}
         run: |
           rm Makefile
+          python_version="$(cat tests/fixture/ansible/.python-version)"
+          printf 'python-version=%s\n' "${python_version%.*}" >> "$GITHUB_OUTPUT"
           if [ "$RESULT" = failure ] && [ "$MODE" = sanity ]; then
             printf '%s\n' '---' 'invalid: [' > tests/fixture/ansible/ansible_collections/example/smoke/roles/smoke/tasks/main.yml
           fi
@@ -60,6 +67,8 @@ jobs:
           ansible-config: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/ansible.cfg' || '' }}
           test-playbook: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/valid.yml' || '' }}
           collection: ${{ matrix.mode == 'sanity' && 'tests/fixture/ansible/ansible_collections/example/smoke' || '' }}
+          target-python-version: ${{ matrix.mode == 'sanity' && steps.fixture.outputs.python-version || '' }}
+          sanity-image: ${{ matrix.sanity-image || '' }}
           report-name: Ansible tests - ${{ matrix.mode }} - ${{ matrix.result }}
       - name: Assert - Verify check outcomes and native reports
         if: ${{ always() }}
