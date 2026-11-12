@@ -174,7 +174,7 @@ runs:
       uses: lima-vm/lima-actions/setup@55627e31b78637bf254a8b2a14da8ea7d12564e5 # v1.1.0
       with:
         # renovate: datasource=github-releases depName=lima-vm/lima
-        version: v2.2.1
+        version: v2.3.0
         ssh: ${{ inputs.backend == 'lima' }}
     - name: Create VM
       id: create
