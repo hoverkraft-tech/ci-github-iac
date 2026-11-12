@@ -58,7 +58,8 @@ checksum aligned with `tests/fixture/lima.yml`.
 The Lima version is maintained in `actions/vm/create/action.yml`.
 Keep the token scoped to this repository and the repository configuration in
 `.github/renovate.json`. Dependabot owns Actions, Dockerfile, Python and action
-test-package updates;
+test-package updates. Its npm directory glob `/actions/*/*` matches the action
+package layout used by `make test`;
 Renovate owns Lima, Goss, the documentation image and the action `.node-version`
 files, grouping Node.js runtime updates in one pull request.
 
@@ -106,7 +107,7 @@ Keep reusable test helpers in `tests/helpers/` and synthetic inputs in
 that parse action YAML or emulate the GitHub Script runtime. The public actions require no npm installation
 in consumer workflows.
 
-`__shared-ci.yml` runs all five dedicated workflows:
+`__shared-ci.yml` runs the dedicated workflows:
 
 | Workflow in `.github/workflows/`           | Action                  | Coverage                                                                            |
 | ------------------------------------------ | ----------------------- | ----------------------------------------------------------------------------------- |
@@ -257,3 +258,22 @@ failure reports against a VM created by the workflow. That scenario consumes SSH
 outputs and owns its reboot policy; the workflow always destroys the VM.
 Dependabot updates Molecule's requirements; validate both native and VM scenarios
 before accepting an update.
+
+## Native OpenTofu tests
+
+`opentofu/test` composes the official setup Action with native `init -backend=false`
+and `test`. Consumers own module/test files, variable environment and disposable
+infrastructure. No formatting, provider setup, state bootstrap or arbitrary command
+is part of this action. Its dedicated workflow tests success, failed assertions,
+empty suites and initialization failure, including published artifacts.
+
+OpenTofu currently has JSON test events but no JUnit output. The adjacent reporting
+adapter validates complete results and emits only filenames, run names and fixed
+outcome messages. It discards raw diagnostic/state content. Focused unit tests
+protect incomplete reports, escaping and cleanup failure after passing assertions.
+The upstream dflook test action was considered; its container does not expose the
+native events or a host runtime for the consumer's following recovery scenario.
+Reuse official setup and native execution, keeping only this reporting gap here.
+
+Renovate maintains the fixture's `.opentofu-version` and the adapter's Node version;
+Dependabot maintains the upstream setup Action. Generate its reference with `make docs`.

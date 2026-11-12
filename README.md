@@ -37,6 +37,13 @@ The action does not require or manage a VM.
 Run native Molecule scenarios with pinned tools and published task reports.
 Your scenario defines its target environment, inventory, playbooks and test sequence.
 
+### OpenTofu
+
+#### - [Test OpenTofu](actions/opentofu/test/README.md)
+
+Run native module tests with a pinned runtime and consolidated test reports.
+Your repository supplies the module, tests and disposable provider environment.
+
 ### Virtual machines
 
 #### - [Create VM](actions/vm/create/README.md)
