@@ -1,0 +1,126 @@
+# Run native OpenTofu tests and publish their results through Hoverkraft reporting.
+#
+# Supply a module containing native `.tofutest.hcl` or `.tftest.hcl` tests and a
+# checkout-relative file containing an exact stable OpenTofu version. The action
+# composes the official setup Action, `tofu init -backend=false` and `tofu test`.
+# Provider and module installation uses the consumer's configuration and lockfile.
+# Formatting and linting remain separate. No arbitrary command input is exposed.
+#
+# Use a fresh Linux runner and disposable test infrastructure. Native tests can
+# create resources and own their cleanup; workflows must bound runtime and retain
+# an independent cleanup path for interrupted provider tests. Backend initialization
+# is disabled: this action never migrates the consumer's operational state.
+# Repository-specific recovery and provider scenarios stay in the consumer.
+# Supply native TF_VAR variables through the step environment, never action inputs.
+#
+# OpenTofu currently emits test events as JSON rather than JUnit. A small adapter
+# retains only test names and outcomes in JUnit; diagnostic text, plans, state,
+# variable values and raw event streams are never uploaded. Failures, empty suites,
+# incomplete reports and cleanup errors remain failures. Use synthetic fixtures;
+# test names and filenames are public report metadata.
+#
+# Reports are parsed as summaries and annotations and retained for seven days,
+# including after test failures. Set `comment: false` with the common `ci-reports`
+# workflow to consolidate results. Individual comments require `pull-requests: write`
+# and are skipped for fork PRs. Never execute untrusted tests via pull_request_target.
+---
+name: OpenTofu - Test
+description: Run native OpenTofu tests with the official runtime, summaries, JUnit artifacts and optional PR comments.
+author: Hoverkraft
+branding:
+  icon: check-circle
+  color: purple
+inputs:
+  working-directory:
+    description: Checkout-relative module directory containing native OpenTofu tests.
+    required: true
+  tofu-version-file:
+    description: Checkout-relative file containing an exact stable OpenTofu version maintained by the consumer.
+    required: true
+  report-name:
+    description: Stable report title, distinct for each test step or matrix entry.
+    default: OpenTofu test results
+  comment:
+    description: Publish an individual PR comment. Set false when using the shared ci-reports workflow.
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - name: Prepare OpenTofu inputs and private report directory
+      id: inputs
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        MODULE_PATH: ${{ inputs.working-directory }}
+        VERSION_FILE: ${{ inputs.tofu-version-file }}
+      with:
+        script: |
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = fs.realpathSync(process.env.GITHUB_WORKSPACE);
+          for (const [name, value, directory] of [
+            ['module', process.env.MODULE_PATH, true],
+            ['version-file', process.env.VERSION_FILE, false],
+          ]) {
+            if (!value || path.isAbsolute(value)) throw new Error(`${name} must be checkout-relative`);
+            const resolved = fs.realpathSync(path.resolve(root, value));
+            if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`))
+              throw new Error(`${name} must stay inside the checkout`);
+            if (directory ? !fs.statSync(resolved).isDirectory() : !fs.statSync(resolved).isFile())
+              throw new Error(`Invalid ${name} type`);
+            if (!directory && !/^\d+\.\d+\.\d+$/.test(fs.readFileSync(resolved, 'utf8').trim()))
+              throw new Error('Pin one stable OpenTofu release in tofu-version-file');
+            core.setOutput(name, resolved);
+          }
+          const reports = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'opentofu-test-'));
+          core.setOutput('directory', reports);
+          core.setOutput('id', path.basename(reports));
+
+    - name: Install the pinned OpenTofu runtime
+      uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+      with:
+        tofu_version_file: ${{ steps.inputs.outputs.version-file }}
+        tofu_wrapper: false
+
+    - name: Run native OpenTofu tests
+      id: test
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        MODULE_PATH: ${{ steps.inputs.outputs.module }}
+        REPORT_DIRECTORY: ${{ steps.inputs.outputs.directory }}
+        TF_IN_AUTOMATION: "true"
+        TF_INPUT: "false"
+      with:
+        script: |
+          const { OpenTofuTests } = require(`${process.env.ACTION_PATH}/opentofu.cjs`);
+          await new OpenTofuTests(core, exec).run(process.env.MODULE_PATH, process.env.REPORT_DIRECTORY);
+
+    - name: Parse OpenTofu reports
+      id: parse
+      if: ${{ !cancelled() && steps.test.outputs.report != '' }}
+      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
+      with:
+        report-name: ${{ inputs.report-name }}
+        report-paths: ${{ steps.test.outputs.report }}
+        output-format: summary,markdown,annotations
+
+    # Standard standalone-action comment publication shared by test actions.
+    # jscpd:ignore-start
+    - name: Add OpenTofu PR comment
+      if: >-
+        ${{ !cancelled() && inputs.comment == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.parse.outputs.markdown != '' }}
+      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
+      with:
+        title: ${{ inputs.report-name }}
+        body: ${{ steps.parse.outputs.markdown }}
+        token: ${{ github.token }}
+    # jscpd:ignore-end
+
+    - name: Upload OpenTofu reports
+      if: ${{ !cancelled() && steps.test.outputs.report != '' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ci-reports-${{ github.run_attempt }}-${{ github.job }}-${{ steps.inputs.outputs.id }}
+        path: ${{ steps.test.outputs.report }}
+        if-no-files-found: error
+        retention-days: 7

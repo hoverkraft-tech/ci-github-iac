@@ -46,3 +46,9 @@ jobs:
       contents: read
       pull-requests: write
     uses: $/.github/workflows/__test-actions-ansible-test-molecule.yml
+  test-action-opentofu-test:
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    uses: $/.github/workflows/__test-actions-opentofu-test.yml

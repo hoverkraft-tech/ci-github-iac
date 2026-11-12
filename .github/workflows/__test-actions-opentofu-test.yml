@@ -1,0 +1,81 @@
+---
+name: Internal - Test opentofu/test
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Arrange - Checkout reporting adapter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Act - Test native report validation
+        uses: hoverkraft-tech/ci-github-nodejs/actions/test@02a04ad25ceaacdf3b7200e45fb7fec07fadf4fa # 2.1.0
+        with:
+          working-directory: actions/opentofu/test
+          command: test:ci
+          coverage: ""
+          comment: "false"
+  scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        result: [success, assertion-failure, empty, init-failure]
+    steps:
+      - name: Arrange - Checkout native fixtures
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Arrange - Select the native fixture outcome
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SCENARIO: ${{ matrix.result }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const test = 'tests/fixture/opentofu/main.tofutest.hcl';
+            if (process.env.SCENARIO === 'assertion-failure')
+              fs.writeFileSync(test, fs.readFileSync(test, 'utf8').replace('==', '!='));
+            if (process.env.SCENARIO === 'empty') await io.rmRF(test);
+            if (process.env.SCENARIO === 'init-failure')
+              fs.writeFileSync('tests/fixture/opentofu/main.tofu', 'invalid {');
+      - name: Act - Run native OpenTofu tests
+        id: test
+        continue-on-error: true
+        uses: $/actions/opentofu/test
+        with:
+          working-directory: tests/fixture/opentofu
+          tofu-version-file: tests/fixture/opentofu/.opentofu-version
+          report-name: OpenTofu - ${{ matrix.result }}
+          comment: ${{ matrix.result == 'success' && 'true' || 'false' }}
+      - name: Assert - Verify outcomes and published safe reports
+        if: ${{ always() }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SCENARIO: ${{ matrix.result }}
+          OUTCOME: ${{ steps.test.outcome }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { PublishedReports } = require('./tests/helpers/published-reports.cjs');
+            const success = process.env.SCENARIO === 'success';
+            assert.equal(process.env.OUTCOME, success ? 'success' : 'failure');
+            const [report] = await new PublishedReports(github, context).read('opentofu-test-', 1);
+            assert.deepEqual(report.files.map(file => require('node:path').basename(file)), ['opentofu.junit.xml']);
+            assert.equal(/<(?:failure|error)\b/.test(report.text), !success);
+            assert.ok(!report.text.includes('synthetic-native-test'));
+            if (success) {
+              assert.match(report.text, /apply_and_read/);
+              await new PublishedReports(github, context).comment('OpenTofu - success');
+            }

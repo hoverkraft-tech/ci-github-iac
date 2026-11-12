@@ -40,6 +40,14 @@
 			"versioningTemplate": "semver",
 			"currentValueTemplate": "v{{{version}}}",
 			"autoReplaceStringTemplate": "\"version\": \"{{{replace '^v' '' newValue}}}\",\n\t\"sha256\": \"{{{newDigest}}}\""
+		},
+		{
+			"customType": "regex",
+			"managerFilePatterns": ["/^tests/fixture/opentofu/\\.opentofu-version$/"],
+			"matchStrings": ["(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+			"datasourceTemplate": "github-releases",
+			"depNameTemplate": "opentofu/opentofu",
+			"extractVersionTemplate": "^v(?<version>.*)$"
 		}
 	]
 }

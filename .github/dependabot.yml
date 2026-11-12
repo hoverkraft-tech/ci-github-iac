@@ -26,11 +26,7 @@ updates:
       prefix: build
       include: scope
     directories:
-      - /actions/ansible/test
-      - /actions/ansible/test-molecule
-      - /actions/vm/create
-      - /actions/vm/test
-      - /actions/vm/destroy
+      - "/actions/*/*"
     cooldown:
       default-days: 7
     schedule:
