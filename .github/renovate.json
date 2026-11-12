@@ -3,7 +3,7 @@
 	"semanticCommitType": "build",
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:recommended"],
-	"enabledManagers": ["custom.regex", "nodenv"],
+	"enabledManagers": ["custom.regex", "nodenv", "pyenv"],
 	"packageRules": [
 		{
 			"matchManagers": ["nodenv"],
@@ -11,6 +11,18 @@
 		}
 	],
 	"customManagers": [
+		{
+			"customType": "regex",
+			"description": "Update the Ansible sanity image within its compatible Core release series",
+			"managerFilePatterns": [
+				"/^\\.github/workflows/__test-actions-ansible-test\\.yml$/"
+			],
+			"matchStrings": [
+				"sanity-image: (?<depName>quay\\.io/ansible/default-test-container):(?<currentValue>v\\d+\\.\\d+-\\d+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+			],
+			"datasourceTemplate": "docker",
+			"versioningTemplate": "regex:^(?<compatibility>v\\d+\\.\\d+)-(?<patch>\\d+)$"
+		},
 		{
 			"customType": "regex",
 			"managerFilePatterns": ["/^actions/.*\\.yml$/"],

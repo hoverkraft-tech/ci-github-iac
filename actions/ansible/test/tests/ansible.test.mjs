@@ -48,6 +48,7 @@ suite("ansible/test", () => {
 		// Assert
 		assert.equal(f.outputs.mode, "playbook");
 		assert.equal(f.outputs["target-python-version"], "");
+		assert.equal(f.outputs["sanity-image"], "");
 		assert.equal(f.outputs["ansible-core-ref"], "v2.99.1");
 		assert.equal(
 			fs.readFileSync(f.outputs.constraint, "utf8"),
@@ -73,17 +74,23 @@ suite("ansible/test", () => {
 			ANSIBLE_TEST_PLAYBOOK: "",
 			ANSIBLE_COLLECTION: collection,
 			ANSIBLE_TARGET_PYTHON_VERSION: "3.99",
+			ANSIBLE_SANITY_IMAGE: "example.invalid/ansible-test:v99",
 		}).prepare();
 
 		// Assert
 		assert.equal(f.outputs.mode, "sanity");
 		assert.equal(f.outputs["collection-root"], collection);
 		assert.equal(f.outputs["target-python-version"], "3.99");
+		assert.equal(f.outputs["sanity-image"], "example.invalid/ansible-test:v99");
 	});
 
 	test("ambiguous selections, missing targets, non-pinned versions and escaping paths fail", async (t) => {
 		// Arrange
 		const f = fixture(t);
+		fs.writeFileSync(
+			path.join(f.workspace, "galaxy.yml"),
+			"namespace: example\nname: smoke\n",
+		);
 		fs.symlinkSync(f.temp, path.join(f.workspace, "outside"));
 		fs.writeFileSync(
 			path.join(f.workspace, "floating.txt"),
@@ -97,6 +104,12 @@ suite("ansible/test", () => {
 			{ ANSIBLE_TEST_PLAYBOOK: "../temp" },
 			{ ANSIBLE_REQUIREMENTS: "floating.txt" },
 			{ ANSIBLE_TARGET_PYTHON_VERSION: "3.99" },
+			{ ANSIBLE_SANITY_IMAGE: "example.invalid/ansible-test:v99" },
+			{
+				ANSIBLE_TEST_PLAYBOOK: "",
+				ANSIBLE_COLLECTION: ".",
+				ANSIBLE_SANITY_IMAGE: "example.invalid/ansible-test:v99",
+			},
 			{
 				ANSIBLE_TEST_PLAYBOOK: "",
 				ANSIBLE_COLLECTION: ".",

@@ -28,6 +28,10 @@
 # to full commit SHAs. Source stays in the consumer's checked-out collection.
 # Sanity covers all supported Python versions unless `target-python-version`
 # selects the consumer's supported runtime. These are sanity results, not code coverage.
+# Set `sanity-image` to a pinned compatible container when the upstream default
+# image is unsuitable. This forwards the upstream action's Docker image setting;
+# also select `target-python-version`, because custom images do not declare
+# Ansible's default Python matrix. Use a matrix for multiple supported runtimes.
 #
 # Paths must stay inside the checkout and use letters, digits, dots, underscores,
 # hyphens and slashes. Each collection needs `galaxy.yml`. Use a fresh checkout per
@@ -72,6 +76,9 @@ inputs:
   target-python-version:
     description: Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.
     default: ""
+  sanity-image:
+    description: Optional pinned Docker image for collection sanity. Requires target-python-version; empty uses Ansible Core's default image and Python matrix.
+    default: ""
   ansible-config:
     description: Optional checkout-relative ansible.cfg file for test playbook execution.
     default: ""
@@ -96,6 +103,7 @@ runs:
         ANSIBLE_TEST_PLAYBOOK: ${{ inputs.test-playbook }}
         ANSIBLE_COLLECTION: ${{ inputs.collection }}
         ANSIBLE_TARGET_PYTHON_VERSION: ${{ inputs.target-python-version }}
+        ANSIBLE_SANITY_IMAGE: ${{ inputs.sanity-image }}
         ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
         ANSIBLE_GALAXY_REQUIREMENTS: ${{ inputs.galaxy-requirements }}
       with:
@@ -140,6 +148,7 @@ runs:
         collection-src-directory: ${{ github.workspace }}
         collection-root: ${{ steps.inputs.outputs.collection-root }}
         target-python-version: ${{ steps.inputs.outputs.target-python-version }}
+        docker-image: ${{ steps.inputs.outputs.sanity-image }}
         test-deps: ${{ steps.inputs.outputs.galaxy != '' && format('-r {0}', steps.inputs.outputs.galaxy) || '' }}
         coverage: never
 

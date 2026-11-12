@@ -54,6 +54,10 @@ disabled for sanity checks. The selected upstream revision pins nested actions
 to full commit SHAs. Source stays in the consumer's checked-out collection.
 Sanity covers all supported Python versions unless `target-python-version`
 selects the consumer's supported runtime. These are sanity results, not code coverage.
+Set `sanity-image` to a pinned compatible container when the upstream default
+image is unsuitable. This forwards the upstream action's Docker image setting;
+also select `target-python-version`, because custom images do not declare
+Ansible's default Python matrix. Use a matrix for multiple supported runtimes.
 
 Paths must stay inside the checkout and use letters, digits, dots, underscores,
 hyphens and slashes. Each collection needs `galaxy.yml`. Use a fresh checkout per
@@ -84,16 +88,17 @@ and the current run attempt, so earlier attempts cannot leak stale results.
 
 ## Inputs
 
-| **Input**                   | **Description**                                                                                                                             | **Required** | **Default**            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
-| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                  | **true**     | -                      |
-| **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively.          | **false**    | -                      |
-| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                          | **false**    | -                      |
-| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                               | **false**    | -                      |
-| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                                    | **false**    | -                      |
-| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                                       | **false**    | -                      |
-| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                           | **false**    | `Ansible test results` |
-| **`comment`**               | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled. | **false**    | `true`                 |
+| **Input**                   | **Description**                                                                                                                                | **Required** | **Default**            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
+| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                     | **true**     | -                      |
+| **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively.             | **false**    | -                      |
+| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                             | **false**    | -                      |
+| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                                  | **false**    | -                      |
+| **`sanity-image`**          | Optional pinned Docker image for collection sanity. Requires target-python-version; empty uses Ansible Core's default image and Python matrix. | **false**    | -                      |
+| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                                       | **false**    | -                      |
+| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                                          | **false**    | -                      |
+| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                              | **false**    | `Ansible test results` |
+| **`comment`**               | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.    | **false**    | `true`                 |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -136,7 +141,7 @@ This documentation was automatically generated by [CI Dokumentor](https://github
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@2c1945afe85bb687c15da83e332b4c52aabae290 # 1.1.0
+- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@f79197ed335849b362694735d0fe7d0e6a55c4e9 # dependabot/pip/tests/fixture/ansible/python-dependencies-f8f2875693
   with:
     # Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     # This input is required.
@@ -150,6 +155,9 @@ This documentation was automatically generated by [CI Dokumentor](https://github
 
     # Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.
     target-python-version: ""
+
+    # Optional pinned Docker image for collection sanity. Requires target-python-version; empty uses Ansible Core's default image and Python matrix.
+    sanity-image: ""
 
     # Optional checkout-relative ansible.cfg file for test playbook execution.
     ansible-config: ""

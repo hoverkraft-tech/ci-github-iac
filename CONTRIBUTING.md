@@ -62,6 +62,8 @@ test-package updates. Its npm directory glob `/actions/*/*` matches the action
 package layout used by `make test`;
 Renovate owns Lima, Goss, the documentation image and the action `.node-version`
 files, grouping Node.js runtime updates in one pull request.
+It also maintains the Ansible fixture's `.python-version` and sanity image tag/digest
+within the selected Ansible Core series. Review the image series when upgrading Core.
 
 ## Validation
 
@@ -119,6 +121,8 @@ in consumer workflows.
 
 `__test-actions-ansible-test.yml` exercises playbook tests and collection sanity success/failure
 scenarios through maintained playbook execution and Ansible community testing actions.
+The role-only sanity fixture uses a pinned upstream container and explicit Python
+runtime; it contains no Python modules requiring a multi-version target matrix.
 It verifies native report publication after failures. Adjacent JavaScript only
 validates inputs and collects reports; upstream actions own test execution,
 collection Python setup and containers. Playbook tests use a temporary virtual
