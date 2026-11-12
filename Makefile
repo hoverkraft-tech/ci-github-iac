@@ -42,7 +42,7 @@ docs: ## Generate action and public workflow documentation
 		-v "$(CURDIR):/workspace" \
 		-u "$(HOST_UID):$(HOST_GID)" \
 		-e GITHUB_TOKEN \
-		ghcr.io/hoverkraft-tech/ci-dokumentor/cli:0.5.0 \
+		ghcr.io/hoverkraft-tech/ci-dokumentor/cli:0.6.0 \
 		generate --source "actions/**/action.{yml,yaml}" ".github/workflows/!(__*).{yml,yaml}"
 
 #############################
