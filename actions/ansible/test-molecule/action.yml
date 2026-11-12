@@ -13,6 +13,7 @@
 #   with:
 #     molecule-scenario: tests/molecule/default
 #     ansible-requirements: requirements.txt
+#     python-version-file: .python-version
 #     report-name: Ansible integration tests
 # ```
 #
@@ -30,7 +31,10 @@
 #
 # Use a fresh Linux GitHub-hosted runner. Supply an exact stable `ansible-core==X.Y.Z`
 # pin in `ansible-requirements`; the action installs that pin and its maintained
-# Molecule release into a private environment. The runner's Python must support both.
+# Molecule release into a private environment. The action owns Python setup through
+# actions/setup-python. Pass `python-version-file` for the consumer's maintained
+# controller pin; otherwise setup-python reads the root `.python-version` or uses
+# the Python already on PATH. Select a version supported by both pinned tools.
 # Configure extra target dependencies and collection search paths in the scenario
 # or `ansible-config`. Input files must remain inside the checkout and use letters,
 # digits, dots, underscores, hyphens and slashes.
@@ -82,6 +86,9 @@ inputs:
   ansible-requirements:
     description: Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     required: true
+  python-version-file:
+    description: Optional checkout-relative controller Python version file. Otherwise setup-python reads the root .python-version or uses the runner Python. For playbook or Molecule execution only; choose a version supported by the pinned tools.
+    default: ""
   ansible-config:
     description: Optional checkout-relative ansible.cfg for scenario execution and collection search paths.
     default: ""
@@ -105,6 +112,7 @@ runs:
         MOLECULE_SCENARIO: ${{ inputs.molecule-scenario }}
         ANSIBLE_REQUIREMENTS: ${{ inputs.ansible-requirements }}
         ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
+        ANSIBLE_PYTHON_VERSION_FILE: ${{ inputs.python-version-file }}
         ANSIBLE_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
       with:
         script: |
@@ -114,6 +122,11 @@ runs:
           } catch (error) {
             core.setFailed(error.message);
           }
+
+    - name: Set up the controller Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version-file: ${{ steps.scenario-inputs.outputs.python-version-file }}
 
     - name: Install the pinned scenario test runtime
       shell: bash

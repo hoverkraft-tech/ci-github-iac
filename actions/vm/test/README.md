@@ -78,7 +78,7 @@ and the current run attempt, so earlier attempts cannot leak stale results.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@2c1945afe85bb687c15da83e332b4c52aabae290 # 1.1.0
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/test@49d8c3244e2a731e1a3dad7110b337d06922806b # 1.2.0
   with:
     # VM reference returned by vm/create in the same job; works with either backend.
     # This input is required.

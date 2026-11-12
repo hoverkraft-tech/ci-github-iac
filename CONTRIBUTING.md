@@ -126,7 +126,10 @@ runtime; it contains no Python modules requiring a multi-version target matrix.
 It verifies native report publication after failures. Adjacent JavaScript only
 validates inputs and collects reports; upstream actions own test execution,
 collection Python setup and containers. Playbook tests use a temporary virtual
-environment and the built-in JUnit callback. Consumers supply their Ansible Core pin,
+environment and the built-in JUnit callback. Both Ansible playbook and Molecule
+actions own controller setup through `actions/setup-python`; `python-version-file`
+reuses the consumer's maintained pin. The hosted fixtures assert the interpreter
+actually executing the native playbook. Collection sanity owns its own runtime. Consumers supply their Ansible Core pin,
 Galaxy requirements and selected targets. Dependabot maintains upstream action
 pins and the fixture's requirements file. Linting remains in the separate linter workflow.
 

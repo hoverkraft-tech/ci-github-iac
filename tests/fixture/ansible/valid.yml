@@ -7,6 +7,8 @@
   tasks:
     - name: Assert the selected fixture succeeds
       ansible.builtin.assert:
-        that: fixture_result == 'success'
+        that:
+          - fixture_result == 'success'
+          - lookup('ansible.builtin.pipe', (ansible_playbook_python | quote) ~ ' --version') | trim == 'Python ' ~ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'GITHUB_WORKSPACE') ~ '/tests/fixture/ansible/.python-version')
       vars:
         fixture_result: "{{ lookup('ansible.builtin.env', 'FIXTURE_RESULT') }}"

@@ -14,5 +14,6 @@
     - name: Assert configuration and selected outcome
       ansible.builtin.assert:
         that:
+          - lookup('ansible.builtin.pipe', (ansible_playbook_python | quote) ~ ' --version') | trim == 'Python ' ~ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'GITHUB_WORKSPACE') ~ '/tests/fixture/ansible/.python-version')
           - (configuration.content | b64decode) == "scenario-owned configuration\n"
           - lookup('ansible.builtin.env', 'MOLECULE_TEST_RESULT') != 'failure'

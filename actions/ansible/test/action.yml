@@ -14,7 +14,11 @@
 # Test playbooks are executed by
 # [dawidd6/action-ansible-playbook](https://github.com/dawidd6/action-ansible-playbook).
 # The pinned Ansible Core is installed in a temporary virtual environment using
-# the runner's Python; that Python must be supported by the selected Ansible Core.
+# the controller Python selected by actions/setup-python. Pass `python-version-file`
+# to reuse a maintained pin without a separate workflow setup step. Otherwise,
+# setup-python reads the root `.python-version` or uses the Python already on PATH.
+# Select a controller version supported by the pinned Ansible Core; collection
+# sanity continues to own its separate runtime and rejects this controller input.
 # Ansible's built-in JUnit callback writes task results, including failed assertions.
 # Provide test assertions and disposable targets, never a deployment playbook.
 # Use `ansible-config` for inventory and collection search paths, and
@@ -79,6 +83,9 @@ inputs:
   sanity-image:
     description: Optional pinned Docker image for collection sanity. Requires target-python-version; empty uses Ansible Core's default image and Python matrix.
     default: ""
+  python-version-file:
+    description: Optional checkout-relative controller Python version file. Otherwise setup-python reads the root .python-version or uses the runner Python. For playbook or Molecule execution only; choose a version supported by the pinned tools.
+    default: ""
   ansible-config:
     description: Optional checkout-relative ansible.cfg file for test playbook execution.
     default: ""
@@ -105,6 +112,7 @@ runs:
         ANSIBLE_TARGET_PYTHON_VERSION: ${{ inputs.target-python-version }}
         ANSIBLE_SANITY_IMAGE: ${{ inputs.sanity-image }}
         ANSIBLE_CONFIG_FILE: ${{ inputs.ansible-config }}
+        ANSIBLE_PYTHON_VERSION_FILE: ${{ inputs.python-version-file }}
         ANSIBLE_GALAXY_REQUIREMENTS: ${{ inputs.galaxy-requirements }}
       with:
         script: |
@@ -115,15 +123,25 @@ runs:
             core.setFailed(error.message);
           }
 
+    - name: Set up the controller Python
+      if: steps.inputs.outputs.mode == 'playbook'
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version-file: ${{ steps.inputs.outputs.python-version-file }}
+
     - name: Install the pinned Ansible test runtime
       if: steps.inputs.outputs.mode == 'playbook'
-      shell: bash
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         REPORT_DIRECTORY: ${{ steps.inputs.outputs.report-directory }}
         REQUIREMENTS: ${{ steps.inputs.outputs.constraint }}
-      run: |
-        python3 -m venv "$REPORT_DIRECTORY/venv"
-        "$REPORT_DIRECTORY/venv/bin/pip" install --disable-pip-version-check -r "$REQUIREMENTS"
+      with:
+        script: |
+          const path = require('node:path');
+          const runtime = path.join(process.env.REPORT_DIRECTORY, 'venv');
+          await exec.exec('python3', ['-m', 'venv', runtime]);
+          await exec.exec(path.join(runtime, 'bin/pip'), ['install', '--disable-pip-version-check', '-r', process.env.REQUIREMENTS]);
+          core.addPath(path.join(runtime, 'bin'));
 
     - name: Execute Ansible test playbook
       if: steps.inputs.outputs.mode == 'playbook'

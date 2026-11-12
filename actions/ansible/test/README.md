@@ -40,7 +40,11 @@ Linting and playbook syntax checks belong in separate consumer jobs.
 Test playbooks are executed by
 [dawidd6/action-ansible-playbook](https://github.com/dawidd6/action-ansible-playbook).
 The pinned Ansible Core is installed in a temporary virtual environment using
-the runner's Python; that Python must be supported by the selected Ansible Core.
+the controller Python selected by actions/setup-python. Pass `python-version-file`
+to reuse a maintained pin without a separate workflow setup step. Otherwise,
+setup-python reads the root `.python-version` or uses the Python already on PATH.
+Select a controller version supported by the pinned Ansible Core; collection
+sanity continues to own its separate runtime and rejects this controller input.
 Ansible's built-in JUnit callback writes task results, including failed assertions.
 Provide test assertions and disposable targets, never a deployment playbook.
 Use `ansible-config` for inventory and collection search paths, and
@@ -88,17 +92,18 @@ and the current run attempt, so earlier attempts cannot leak stale results.
 
 ## Inputs
 
-| **Input**                   | **Description**                                                                                                                                | **Required** | **Default**            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
-| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                     | **true**     | -                      |
-| **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively.             | **false**    | -                      |
-| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                             | **false**    | -                      |
-| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                                  | **false**    | -                      |
-| **`sanity-image`**          | Optional pinned Docker image for collection sanity. Requires target-python-version; empty uses Ansible Core's default image and Python matrix. | **false**    | -                      |
-| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                                       | **false**    | -                      |
-| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                                          | **false**    | -                      |
-| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                              | **false**    | `Ansible test results` |
-| **`comment`**               | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.    | **false**    | `true`                 |
+| **Input**                   | **Description**                                                                                                                                                                                                                      | **Required** | **Default**            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | ---------------------- |
+| **`ansible-requirements`**  | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                                                                                                           | **true**     | -                      |
+| **`test-playbook`**         | Checkout-relative playbook containing test assertions. This playbook is executed. Supply test-playbook or collection, exclusively.                                                                                                   | **false**    | -                      |
+| **`collection`**            | One checked-out collection directory containing galaxy.yml. Use a matrix for multiple collections.                                                                                                                                   | **false**    | -                      |
+| **`target-python-version`** | Optional Python major.minor for collection sanity checks. Empty tests all versions supported by Ansible Core.                                                                                                                        | **false**    | -                      |
+| **`sanity-image`**          | Optional pinned Docker image for collection sanity. Requires target-python-version; empty uses Ansible Core's default image and Python matrix.                                                                                       | **false**    | -                      |
+| **`python-version-file`**   | Optional checkout-relative controller Python version file. Otherwise setup-python reads the root .python-version or uses the runner Python. For playbook or Molecule execution only; choose a version supported by the pinned tools. | **false**    | -                      |
+| **`ansible-config`**        | Optional checkout-relative ansible.cfg file for test playbook execution.                                                                                                                                                             | **false**    | -                      |
+| **`galaxy-requirements`**   | Optional checkout-relative Galaxy requirements file for third-party role and collection dependencies.                                                                                                                                | **false**    | -                      |
+| **`report-name`**           | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                                                                                                                    | **false**    | `Ansible test results` |
+| **`comment`**               | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.                                                                                          | **false**    | `true`                 |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
@@ -141,7 +146,7 @@ This documentation was automatically generated by [CI Dokumentor](https://github
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@31c11f71d41684e55ae044d8ca114f31e90fcfda # 1.1.1
+- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test@49d8c3244e2a731e1a3dad7110b337d06922806b # 1.2.0
   with:
     # Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     # This input is required.
@@ -158,6 +163,9 @@ This documentation was automatically generated by [CI Dokumentor](https://github
 
     # Optional pinned Docker image for collection sanity. Requires target-python-version; empty uses Ansible Core's default image and Python matrix.
     sanity-image: ""
+
+    # Optional checkout-relative controller Python version file. Otherwise setup-python reads the root .python-version or uses the runner Python. For playbook or Molecule execution only; choose a version supported by the pinned tools.
+    python-version-file: ""
 
     # Optional checkout-relative ansible.cfg file for test playbook execution.
     ansible-config: ""

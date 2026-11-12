@@ -64,6 +64,7 @@ jobs:
           FIXTURE_RESULT: ${{ matrix.result }}
         with:
           ansible-requirements: tests/fixture/ansible/requirements.txt
+          python-version-file: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/.python-version' || '' }}
           ansible-config: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/ansible.cfg' || '' }}
           test-playbook: ${{ matrix.mode == 'playbook' && 'tests/fixture/ansible/valid.yml' || '' }}
           collection: ${{ matrix.mode == 'sanity' && 'tests/fixture/ansible/ansible_collections/example/smoke' || '' }}

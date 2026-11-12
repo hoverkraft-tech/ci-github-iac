@@ -39,6 +39,7 @@ Use [ansible/test](../test/README.md) for test playbooks and collection sanity.
   with:
     molecule-scenario: tests/molecule/default
     ansible-requirements: requirements.txt
+    python-version-file: .python-version
     report-name: Ansible integration tests
 ```
 
@@ -56,7 +57,10 @@ show how scenarios can manage container targets.
 
 Use a fresh Linux GitHub-hosted runner. Supply an exact stable `ansible-core==X.Y.Z`
 pin in `ansible-requirements`; the action installs that pin and its maintained
-Molecule release into a private environment. The runner's Python must support both.
+Molecule release into a private environment. The action owns Python setup through
+actions/setup-python. Pass `python-version-file` for the consumer's maintained
+controller pin; otherwise setup-python reads the root `.python-version` or uses
+the Python already on PATH. Select a version supported by both pinned tools.
 Configure extra target dependencies and collection search paths in the scenario
 or `ansible-config`. Input files must remain inside the checkout and use letters,
 digits, dots, underscores, hyphens and slashes.
@@ -101,7 +105,7 @@ and the current run attempt, so earlier attempts cannot leak stale results.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test-molecule@2c1945afe85bb687c15da83e332b4c52aabae290 # 1.1.0
+- uses: hoverkraft-tech/ci-github-iac/actions/ansible/test-molecule@49d8c3244e2a731e1a3dad7110b337d06922806b # 1.2.0
   with:
     # Checkout-relative directory containing molecule.yml. The scenario defines its inventory, playbooks and test sequence.
     # This input is required.
@@ -110,6 +114,9 @@ and the current run attempt, so earlier attempts cannot leak stale results.
     # Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.
     # This input is required.
     ansible-requirements: ""
+
+    # Optional checkout-relative controller Python version file. Otherwise setup-python reads the root .python-version or uses the runner Python. For playbook or Molecule execution only; choose a version supported by the pinned tools.
+    python-version-file: ""
 
     # Optional checkout-relative ansible.cfg for scenario execution and collection search paths.
     ansible-config: ""
@@ -132,14 +139,15 @@ and the current run attempt, so earlier attempts cannot leak stale results.
 
 ## Inputs
 
-| **Input**                  | **Description**                                                                                                                             | **Required** | **Default**             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------------- |
-| **`molecule-scenario`**    | Checkout-relative directory containing molecule.yml. The scenario defines its inventory, playbooks and test sequence.                       | **true**     | -                       |
-| **`ansible-requirements`** | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                  | **true**     | -                       |
-| **`ansible-config`**       | Optional checkout-relative ansible.cfg for scenario execution and collection search paths.                                                  | **false**    | -                       |
-| **`test-timeout-minutes`** | Native test sequence deadline, from 1 to 40 minutes. Interrupted runs allow two additional minutes for scenario cleanup.                    | **false**    | `20`                    |
-| **`report-name`**          | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                           | **false**    | `Molecule test results` |
-| **`comment`**              | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled. | **false**    | `true`                  |
+| **Input**                  | **Description**                                                                                                                                                                                                                      | **Required** | **Default**             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | ----------------------- |
+| **`molecule-scenario`**    | Checkout-relative directory containing molecule.yml. The scenario defines its inventory, playbooks and test sequence.                                                                                                                | **true**     | -                       |
+| **`ansible-requirements`** | Checkout-relative requirements file containing exactly one stable ansible-core==X.Y.Z pin.                                                                                                                                           | **true**     | -                       |
+| **`python-version-file`**  | Optional checkout-relative controller Python version file. Otherwise setup-python reads the root .python-version or uses the runner Python. For playbook or Molecule execution only; choose a version supported by the pinned tools. | **false**    | -                       |
+| **`ansible-config`**       | Optional checkout-relative ansible.cfg for scenario execution and collection search paths.                                                                                                                                           | **false**    | -                       |
+| **`test-timeout-minutes`** | Native test sequence deadline, from 1 to 40 minutes. Interrupted runs allow two additional minutes for scenario cleanup.                                                                                                             | **false**    | `20`                    |
+| **`report-name`**          | Stable summary and PR comment title, distinct for each test step or matrix entry.                                                                                                                                                    | **false**    | `Molecule test results` |
+| **`comment`**              | Publish an individual PR comment. Set false when using the shared ci-reports workflow; summaries, annotations and artifacts remain enabled.                                                                                          | **false**    | `true`                  |
 
 <!-- inputs:end -->
 <!-- secrets:start -->
