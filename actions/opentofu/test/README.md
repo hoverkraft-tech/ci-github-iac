@@ -56,7 +56,7 @@ and are skipped for fork PRs. Never execute untrusted tests via pull_request_tar
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/opentofu/test@51d24c6eddd109333ffe5c673e482d3270aff05f # feat/opentofu-test
+- uses: hoverkraft-tech/ci-github-iac/actions/opentofu/test@31c11f71d41684e55ae044d8ca114f31e90fcfda # 1.1.1
   with:
     # Checkout-relative module directory containing native OpenTofu tests.
     # This input is required.
