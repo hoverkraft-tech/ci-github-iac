@@ -70,6 +70,7 @@ suite("ansible/test-molecule", () => {
 
 		// Assert
 		assert.equal(state.outputs.scenario, path.join(state.checkout, "default"));
+		assert.equal(state.outputs["python-version-file"], "");
 		assert.equal(
 			fs.readFileSync(state.outputs.constraint, "utf8"),
 			"ansible-core==2.99.1\n",
@@ -81,6 +82,24 @@ suite("ansible/test-molecule", () => {
 		assert.deepEqual(fs.readdirSync(state.outputs["report-directory"]), [
 			"constraints.txt",
 		]);
+	});
+
+	test("Molecule accepts a maintained controller Python version file", (t) => {
+		// Arrange
+		const state = fixture(t);
+		fs.writeFileSync(path.join(state.checkout, ".python-version"), "3.99.1\n");
+
+		// Act
+		new MoleculeInputs({
+			...state.env,
+			ANSIBLE_PYTHON_VERSION_FILE: ".python-version",
+		}).prepare(state.core);
+
+		// Assert
+		assert.equal(
+			state.outputs["python-version-file"],
+			path.join(state.checkout, ".python-version"),
+		);
 	});
 
 	test("Molecule rejects escaping scenarios and config, invalid deadlines and floating runtime pins", async (t) => {
@@ -99,6 +118,8 @@ suite("ansible/test-molecule", () => {
 			{ MOLECULE_SCENARIO: "external" },
 			{ ANSIBLE_REQUIREMENTS: "floating.txt" },
 			{ ANSIBLE_CONFIG_FILE: "external/ansible.cfg" },
+			{ ANSIBLE_PYTHON_VERSION_FILE: "external/ansible.cfg" },
+			{ ANSIBLE_PYTHON_VERSION_FILE: "missing" },
 			{ ANSIBLE_TEST_TIMEOUT_MINUTES: "41" },
 			{ ANSIBLE_TEST_TIMEOUT_MINUTES: "0" },
 		]) {

@@ -51,6 +51,11 @@ class AnsibleInputs {
 				"Provide exactly one test-playbook or collection. Use a matrix for multiple targets.",
 			);
 		}
+		if (collection && this.env.ANSIBLE_PYTHON_VERSION_FILE) {
+			throw new Error(
+				"python-version-file applies to test-playbook only; collection sanity owns its runtime.",
+			);
+		}
 		const requirements = this.checkoutPath(this.env.ANSIBLE_REQUIREMENTS);
 		const pins = [
 			...fs
@@ -72,6 +77,7 @@ class AnsibleInputs {
 			this.checkoutPath(path.join(collectionRoot, "galaxy.yml"));
 		const optionalFiles = {
 			config: this.env.ANSIBLE_CONFIG_FILE,
+			"python-version-file": this.env.ANSIBLE_PYTHON_VERSION_FILE,
 			galaxy: this.env.ANSIBLE_GALAXY_REQUIREMENTS,
 		};
 		for (const [name, value] of Object.entries(optionalFiles)) {
@@ -80,7 +86,6 @@ class AnsibleInputs {
 		const reports = fs.mkdtempSync(
 			path.join(this.env.RUNNER_TEMP, "ansible-reports-"),
 		);
-		if (playbook) this.core.addPath(path.join(reports, "venv/bin"));
 		const constraint = path.join(reports, "constraints.txt");
 		fs.writeFileSync(constraint, `ansible-core==${pins[0][1]}\n`);
 		this.core.setOutput("constraint", constraint);

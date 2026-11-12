@@ -47,6 +47,9 @@ class MoleculeInputs {
 		const config = this.env.ANSIBLE_CONFIG_FILE
 			? this.file(this.env.ANSIBLE_CONFIG_FILE)
 			: "";
+		const pythonVersionFile = this.env.ANSIBLE_PYTHON_VERSION_FILE
+			? this.file(this.env.ANSIBLE_PYTHON_VERSION_FILE)
+			: "";
 		const reports = fs.mkdtempSync(
 			path.join(this.env.RUNNER_TEMP, "molecule-reports-"),
 		);
@@ -57,6 +60,7 @@ class MoleculeInputs {
 		for (const [name, value] of Object.entries({
 			scenario: selected,
 			config,
+			"python-version-file": pythonVersionFile,
 			constraint,
 			"report-directory": reports,
 			id: path.basename(reports),

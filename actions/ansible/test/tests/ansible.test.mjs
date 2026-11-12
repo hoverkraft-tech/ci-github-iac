@@ -29,7 +29,6 @@ function fixture(t) {
 		ANSIBLE_TEST_PLAYBOOK: "playbook.yml",
 	};
 	const core = {
-		addPath: () => {},
 		setOutput: (key, value) => {
 			outputs[key] = value;
 		},
@@ -47,6 +46,7 @@ suite("ansible/test", () => {
 
 		// Assert
 		assert.equal(f.outputs.mode, "playbook");
+		assert.equal(f.outputs["python-version-file"], "");
 		assert.equal(f.outputs["target-python-version"], "");
 		assert.equal(f.outputs["sanity-image"], "");
 		assert.equal(f.outputs["ansible-core-ref"], "v2.99.1");
@@ -56,6 +56,24 @@ suite("ansible/test", () => {
 		);
 		assert.equal(f.outputs["test-playbook"], `${f.workspace}/playbook.yml`);
 		assert.equal(path.dirname(f.outputs["report-directory"]), f.temp);
+	});
+
+	test("controller selection validates the consumer's Python version file", (t) => {
+		// Arrange
+		const f = fixture(t);
+		fs.writeFileSync(path.join(f.workspace, ".python-version"), "3.99.1\n");
+
+		// Act
+		new AnsibleInputs(f.core, {
+			...f.env,
+			ANSIBLE_PYTHON_VERSION_FILE: ".python-version",
+		}).prepare();
+
+		// Assert
+		assert.equal(
+			f.outputs["python-version-file"],
+			path.join(f.workspace, ".python-version"),
+		);
 	});
 
 	test("collection inputs select a single checked-out source with Galaxy metadata", async (t) => {
@@ -100,6 +118,13 @@ suite("ansible/test", () => {
 			{ ANSIBLE_TEST_PLAYBOOK: "" },
 			{ ANSIBLE_COLLECTION: "." },
 			{ ANSIBLE_TEST_PLAYBOOK: "missing.yml" },
+			{ ANSIBLE_PYTHON_VERSION_FILE: "missing" },
+			{ ANSIBLE_PYTHON_VERSION_FILE: "outside" },
+			{
+				ANSIBLE_TEST_PLAYBOOK: "",
+				ANSIBLE_COLLECTION: ".",
+				ANSIBLE_PYTHON_VERSION_FILE: "playbook.yml",
+			},
 			{ ANSIBLE_TEST_PLAYBOOK: "outside" },
 			{ ANSIBLE_TEST_PLAYBOOK: "../temp" },
 			{ ANSIBLE_REQUIREMENTS: "floating.txt" },

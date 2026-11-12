@@ -48,6 +48,7 @@ jobs:
         env:
           MOLECULE_TEST_DIRECTORY: ${{ runner.temp }}/molecule-local
         with:
+          python-version-file: tests/fixture/ansible/.python-version
           molecule-scenario: tests/fixture/molecule/local
           ansible-requirements: tests/fixture/ansible/requirements.txt
           test-timeout-minutes: ${{ matrix.result == 'timeout' && '1' || '5' }}
