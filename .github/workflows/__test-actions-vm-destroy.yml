@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       # jscpd:ignore-end
       - name: Act - Run vm/destroy unit tests
-        uses: hoverkraft-tech/ci-github-nodejs/actions/test@02a04ad25ceaacdf3b7200e45fb7fec07fadf4fa # 2.1.0
+        uses: hoverkraft-tech/ci-github-nodejs/actions/test@a60704c5e9902675a1b4a5141411d95733e80ff5 # 3.0.2
         with:
           working-directory: actions/vm/destroy
           command: test:ci

@@ -159,7 +159,7 @@ runs:
     - name: Validate collection sanity with ansible-test
       id: sanity
       if: steps.inputs.outputs.mode == 'sanity'
-      uses: ansible-community/ansible-test-gh-action@dc5c5bfa02fa4b6633e6175e65e9f8f53088180a # unstable/v1
+      uses: ansible-community/ansible-test-gh-action@6ded727edb598e670ac056a8e680ca4050bac0a3 # v1.18.0; unstable/v1
       with:
         testing-type: sanity
         ansible-core-version: ${{ steps.inputs.outputs.ansible-core-ref }}
@@ -190,7 +190,7 @@ runs:
     - name: Parse Ansible reports
       if: ${{ always() && steps.collect.outputs.report-files != '' }}
       id: parse
-      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
+      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@f44e1bcc350b6bfe9e4a86a27b1d5e032e58f292 # 4.2.1
       with:
         report-name: ${{ inputs.report-name }}
         report-paths: ${{ steps.collect.outputs.report-files }}
@@ -200,7 +200,7 @@ runs:
     - name: Add Ansible PR comment
       if: >-
         ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.parse.outputs.markdown != '' }}
-      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@90211d735aa0289702ddbd7eb95b218020ccadad # 2.0.2
+      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@f44e1bcc350b6bfe9e4a86a27b1d5e032e58f292 # 4.2.1
       with:
         title: ${{ inputs.report-name }}
         body: ${{ steps.parse.outputs.markdown }}
