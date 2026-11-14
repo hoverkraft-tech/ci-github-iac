@@ -141,7 +141,7 @@ minor for compatible features, patch for fixes. Consumers pin full commit SHAs;
 do not move release tags.
 
 `__prepare-release.yml` applies the shared Conventional Commit release labels on
-pull requests and prepares release configuration on main pushes.
+pull requests.
 `__release.yml` runs every Monday at 08:25 UTC and supports manual dispatch.
 It runs the complete shared CI on the default branch, then plans and publishes a
 release for that run's exact commit using `ci-github-publish`. Runs from other
@@ -161,11 +161,15 @@ These values can be provided through organization variables and secrets. The app
 contents write and pull request read permissions for publication. Its token allows
 the resulting tag push to trigger main CI.
 
-After successful main CI, the shared `release-actions` workflow regenerates action
+Main CI runs on main and tag pushes, manual dispatch, and the weekly schedule.
+The weekly run validates the repository without updating documentation.
+After successful push or manual main CI, the shared `release-actions` workflow regenerates action
 documentation and opens or updates its documentation PR, using squash merging.
 Tag pushes and manual main CI runs refresh all action references. Internal `__`
 workflows are excluded from generation. Documentation automation uses the same app,
-with contents, pull request and workflow write permissions.
+with contents, pull request and workflow write permissions. Successful main-branch
+documentation generation sends its artifact to the public documentation portal
+through `public-docs/sync-docs-dispatcher.yml`.
 
 Renovate updates the Goss version and archive SHA-256 together using the
 `github-release-attachments` datasource. Review the Ubuntu image URL and SHA-256
