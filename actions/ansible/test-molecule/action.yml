@@ -177,7 +177,7 @@ runs:
     - name: Parse scenario reports
       if: ${{ always() && steps.scenario-reports.outputs.report-files != '' }}
       id: parse-scenario-reports
-      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@2fa562bd44f9e752a99a374c85ae14644e7f2bdd # 4.2.2
+      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
       with:
         report-name: ${{ inputs.report-name }}
         report-paths: ${{ steps.scenario-reports.outputs.report-files }}
@@ -187,7 +187,7 @@ runs:
     - name: Add scenario PR comment
       if: >-
         ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.parse-scenario-reports.outputs.markdown != '' }}
-      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@2fa562bd44f9e752a99a374c85ae14644e7f2bdd # 4.2.2
+      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
       with:
         title: ${{ inputs.report-name }}
         body: ${{ steps.parse-scenario-reports.outputs.markdown }}
