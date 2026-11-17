@@ -109,7 +109,7 @@ runs:
     - name: Parse test reports
       if: ${{ always() && (steps.test.outputs.report-files != '' || steps.test.outputs.report != '') }}
       id: parse-test-reports
-      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
+      uses: hoverkraft-tech/ci-github-common/actions/quality/parse-ci-reports@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
       with:
         report-name: ${{ inputs.report-name }}
         report-paths: |
@@ -120,7 +120,7 @@ runs:
     - name: Add test PR comment
       if: >-
         ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.parse-test-reports.outputs.markdown != '' }}
-      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@c63b4ce928082260ab263abc01faf3c1fa20c52b # 4.2.3
+      uses: hoverkraft-tech/ci-github-common/actions/create-or-update-comment@d606f77fad305ef07dfde3db5270f5e324019c97 # 4.2.4
       with:
         title: ${{ inputs.report-name }}
         body: ${{ steps.parse-test-reports.outputs.markdown }}
