@@ -172,7 +172,7 @@ configuration private. `vm/test` uses it internally to open fresh guest logins.
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@d68eae92246f1b635fe0564c47089054ee87de79 # 1.3.1
+- uses: hoverkraft-tech/ci-github-iac/actions/vm/create@ea900e96c5330ad3da233ae05601fa4800eebeb4 # 1.3.2
   with:
     # Creation backend, lima (default) or qemu. Testing and cleanup use the returned vm reference without another backend choice.
     # Default: `lima`
