@@ -27,7 +27,7 @@ formatting drift, initialization errors and an empty module selection fail the a
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/terraform/validate@80192f805627fba4ad50752f72c5793a8efe5b8e # feat/terraform-ci-and-docs
+- uses: hoverkraft-tech/ci-github-iac/actions/terraform/validate@e47f0d620e50ca1755e868189c563449c9adefd9 # feat/terraform-ci-and-docs
   with:
     # Checkout-relative root containing one or more Terraform modules.
     # Default: `.`

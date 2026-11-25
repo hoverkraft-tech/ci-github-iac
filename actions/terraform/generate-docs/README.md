@@ -13,11 +13,11 @@
 
 ## Overview
 
-Generate and inject Terraform module references into README files.
+Generate and inject Terraform module references into readme files.
 
-Generate Terraform module reference sections using the upstream terraform-docs action.
-Existing README content outside BEGIN_TF_DOCS/END_TF_DOCS markers is preserved.
-Modules are discovered recursively below working-directory. Lockfile data is
+Generate Terraform module reference sections using the official terraform-docs CLI.
+Existing readme content outside BEGIN_TF_DOCS/END_TF_DOCS markers is preserved.
+Tracked modules are discovered recursively below working-directory. Lockfile data is
 excluded so documentation does not depend on prior provider initialization.
 This action only edits the checkout; callers own committing or publishing changes.
 
@@ -27,7 +27,7 @@ This action only edits the checkout; callers own committing or publishing change
 ## Usage
 
 ```yaml
-- uses: hoverkraft-tech/ci-github-iac/actions/terraform/generate-docs@80192f805627fba4ad50752f72c5793a8efe5b8e # feat/terraform-ci-and-docs
+- uses: hoverkraft-tech/ci-github-iac/actions/terraform/generate-docs@e47f0d620e50ca1755e868189c563449c9adefd9 # feat/terraform-ci-and-docs
   with:
     # Checkout-relative root containing Terraform modules to document.
     # Default: `.`

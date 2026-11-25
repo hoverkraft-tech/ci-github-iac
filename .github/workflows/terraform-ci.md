@@ -36,7 +36,7 @@ on:
 permissions: {}
 jobs:
   terraform-ci:
-    uses: hoverkraft-tech/ci-github-iac/.github/workflows/terraform-ci.yml@80192f805627fba4ad50752f72c5793a8efe5b8e # feat/terraform-ci-and-docs
+    uses: hoverkraft-tech/ci-github-iac/.github/workflows/terraform-ci.yml@e47f0d620e50ca1755e868189c563449c9adefd9 # feat/terraform-ci-and-docs
     permissions:
       contents: read
     with:

@@ -15,7 +15,7 @@
 
 Regenerate module references after successful CI on a trusted default-branch push.
 The GitHub App needs contents and pull request write permissions. The shared
-documentation PR action commits only module README files and requests a squash
+documentation PR action commits only module readme files and requests a squash
 merge. Callers retain control of when this write workflow runs.
 
 ### Permissions
@@ -36,7 +36,7 @@ on:
 permissions: {}
 jobs:
   terraform-docs:
-    uses: hoverkraft-tech/ci-github-iac/.github/workflows/terraform-docs.yml@80192f805627fba4ad50752f72c5793a8efe5b8e # feat/terraform-ci-and-docs
+    uses: hoverkraft-tech/ci-github-iac/.github/workflows/terraform-docs.yml@e47f0d620e50ca1755e868189c563449c9adefd9 # feat/terraform-ci-and-docs
     permissions:
       contents: read
     secrets:
