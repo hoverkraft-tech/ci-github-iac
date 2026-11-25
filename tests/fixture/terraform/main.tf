@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.17.2"
+}
+
 variable "name" {
   description = "Synthetic module input."
   type        = string

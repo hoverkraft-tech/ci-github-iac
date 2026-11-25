@@ -35,16 +35,16 @@ runs:
     - name: Validate tracked modules
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
+        ACTION_PATH: ${{ github.action_path }}
         WORKING_DIRECTORY: ${{ steps.directory.outputs.absolute-path }}
         TF_IN_AUTOMATION: "true"
         TF_INPUT: "false"
       with:
         script: |
           const path = require('node:path');
+          const { discoverModules } = require(path.join(process.env.ACTION_PATH, '../_internal/modules.cjs'));
           const cwd = process.env.WORKING_DIRECTORY;
-          const { stdout } = await exec.getExecOutput('git', ['ls-files', '-z', '--', '*.tf', '*.tf.json'], { cwd, silent: true });
-          const modules = [...new Set(stdout.split('\0').filter(Boolean).map(file => path.dirname(file)))].sort();
-          if (!modules.length) throw new Error('No tracked Terraform modules found');
+          const modules = await discoverModules(exec, cwd);
           await exec.exec('terraform', ['fmt', '-check', '-recursive'], { cwd });
           for (const module of modules) {
             const options = { cwd: path.join(cwd, module) };

@@ -1,6 +1,6 @@
 # Regenerate module references after successful CI on a trusted default-branch push.
 # The GitHub App needs contents and pull request write permissions. The shared
-# documentation PR action commits only module README files and requests a squash
+# documentation PR action commits only module readme files and requests a squash
 # merge. Callers retain control of when this write workflow runs.
 ---
 name: Terraform - Update documentation
