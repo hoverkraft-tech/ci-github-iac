@@ -1,0 +1,58 @@
+# Check formatting and validate every tracked Terraform module below the selected directory.
+# Initialization disables the backend and never plans or applies infrastructure.
+# Provider and module downloads use the consumer configuration and lockfiles.
+# Run on a fresh Linux checkout without production credentials. Invalid modules,
+# formatting drift, initialization errors and an empty module selection fail the action.
+---
+name: Terraform - Validate
+description: Check formatting and validate tracked Terraform modules without initializing their backends.
+author: Hoverkraft
+branding:
+  icon: check-circle
+  color: purple
+inputs:
+  working-directory:
+    description: Checkout-relative root containing one or more Terraform modules.
+    default: .
+  terraform-version:
+    description: Terraform version used for formatting, initialization and validation.
+    default: "1.17.2"
+runs:
+  using: composite
+  steps:
+    - name: Resolve module root
+      id: directory
+      uses: hoverkraft-tech/ci-github-common/actions/working-directory@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
+      with:
+        working-directory: ${{ inputs.working-directory }}
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    - name: Validate tracked modules
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        WORKING_DIRECTORY: ${{ steps.directory.outputs.absolute-path }}
+        TF_IN_AUTOMATION: "true"
+        TF_INPUT: "false"
+      with:
+        script: |
+          const path = require('node:path');
+          const cwd = process.env.WORKING_DIRECTORY;
+          const { stdout } = await exec.getExecOutput('git', ['ls-files', '-z', '--', '*.tf', '*.tf.json'], { cwd, silent: true });
+          const modules = [...new Set(stdout.split('\0').filter(Boolean).map(file => path.dirname(file)))].sort();
+          if (!modules.length) throw new Error('No tracked Terraform modules found');
+          await exec.exec('terraform', ['fmt', '-check', '-recursive'], { cwd });
+          for (const module of modules) {
+            const options = { cwd: path.join(cwd, module) };
+            core.startGroup(`Validate ${module}`);
+            try {
+              await exec.exec('terraform', ['init', '-backend=false', '-input=false', '-no-color'], options);
+              await exec.exec('terraform', ['validate', '-no-color'], options);
+            } finally {
+              core.endGroup();
+            }
+          }
