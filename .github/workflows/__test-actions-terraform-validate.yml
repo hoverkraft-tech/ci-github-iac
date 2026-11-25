@@ -1,0 +1,51 @@
+---
+name: Internal - Test terraform/validate
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        result: [success, formatting-failure, validation-failure, empty]
+    steps:
+      - name: Arrange - Checkout synthetic module
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Arrange - Select module scenario
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SCENARIO: ${{ matrix.result }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const file = 'tests/fixture/terraform/main.tf';
+            const source = fs.readFileSync(file, 'utf8');
+            if (process.env.SCENARIO === 'formatting-failure') fs.writeFileSync(file, source.replace('value       =', 'value='));
+            if (process.env.SCENARIO === 'validation-failure') {
+              const nested = 'tests/fixture/terraform/nested/main.tf';
+              fs.writeFileSync(nested, fs.readFileSync(nested, 'utf8').replace('"synthetic"', 'var.undeclared'));
+            }
+            if (process.env.SCENARIO === 'empty') await exec.exec('git', ['rm', file, 'tests/fixture/terraform/nested/main.tf']);
+      - name: Act - Validate modules
+        id: validate
+        continue-on-error: true
+        uses: $/actions/terraform/validate
+        with:
+          working-directory: tests/fixture/terraform
+      - name: Assert - Verify outcome
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SCENARIO: ${{ matrix.result }}
+          OUTCOME: ${{ steps.validate.outcome }}
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            assert.equal(process.env.OUTCOME, process.env.SCENARIO === 'success' ? 'success' : 'failure');

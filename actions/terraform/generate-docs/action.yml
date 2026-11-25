@@ -1,0 +1,46 @@
+# Generate Terraform module reference sections using the official terraform-docs CLI.
+# Existing readme content outside BEGIN_TF_DOCS/END_TF_DOCS markers is preserved.
+# Tracked modules are discovered recursively below working-directory. Lockfile data is
+# excluded so documentation does not depend on prior provider initialization.
+# This action only edits the checkout; callers own committing or publishing changes.
+---
+name: Terraform - Generate documentation
+description: Generate and inject Terraform module references into readme files.
+author: Hoverkraft
+branding:
+  icon: book-open
+  color: purple
+inputs:
+  working-directory:
+    description: Checkout-relative root containing Terraform modules to document.
+    default: .
+runs:
+  using: composite
+  steps:
+    - name: Resolve documentation root
+      id: directory
+      uses: hoverkraft-tech/ci-github-common/actions/working-directory@af0bdd6313bd49aaf4a8a7f0de005fb0db856b03 # 4.3.3
+      with:
+        working-directory: ${{ inputs.working-directory }}
+
+    - name: Generate module references
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        WORKING_DIRECTORY: ${{ steps.directory.outputs.absolute-path }}
+      with:
+        script: |
+          const path = require('node:path');
+          const { discoverModules } = require(path.join(process.env.ACTION_PATH, '../_internal/modules.cjs'));
+          const cwd = process.env.WORKING_DIRECTORY;
+          for (const module of await discoverModules(exec, cwd)) {
+            await exec.exec('docker', [
+              'run', '--rm', '--network', 'none',
+              '--user', `${process.getuid()}:${process.getgid()}`,
+              '--volume', `${cwd}:/terraform-docs`,
+              // terraform-docs v0.25.1, run as the checkout owner without changing the Git index.
+              'quay.io/terraform-docs/terraform-docs:0.25.1@sha256:7b2a74a2b9a9e6af41200335da47b73a64c39a0edd5afb91bc921f0a77eae681',
+              'markdown', 'table', '--lockfile=false', '--output-file', 'README.md',
+              '--output-mode', 'inject', path.posix.join('/terraform-docs', module)
+            ]);
+          }

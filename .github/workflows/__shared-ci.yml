@@ -52,3 +52,11 @@ jobs:
       contents: read
       pull-requests: write
     uses: $/.github/workflows/__test-actions-opentofu-test.yml
+  test-action-terraform-validate:
+    permissions:
+      contents: read
+    uses: $/.github/workflows/__test-actions-terraform-validate.yml
+  test-action-terraform-generate-docs:
+    permissions:
+      contents: read
+    uses: $/.github/workflows/__test-actions-terraform-generate-docs.yml

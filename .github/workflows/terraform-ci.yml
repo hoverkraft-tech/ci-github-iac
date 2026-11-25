@@ -1,0 +1,32 @@
+# Validate Terraform modules on pull requests, main pushes and before releases.
+# Call this workflow with contents: read. It checks formatting and runs init with
+# backend access disabled, then validate for every tracked module. No credentials,
+# plans or applies are required. Runtime failures remain failed checks.
+---
+name: Terraform - Continuous Integration
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Checkout-relative root containing Terraform modules.
+        type: string
+        default: .
+      terraform-version:
+        description: Terraform runtime version.
+        type: string
+        default: "1.17.2"
+permissions: {}
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: $/actions/terraform/validate
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          terraform-version: ${{ inputs.terraform-version }}

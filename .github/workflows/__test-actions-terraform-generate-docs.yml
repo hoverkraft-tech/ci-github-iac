@@ -1,0 +1,40 @@
+---
+name: Internal - Test terraform/generate-docs
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  generation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Arrange - Checkout synthetic module
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Act - Generate module reference
+        uses: $/actions/terraform/generate-docs
+        with:
+          working-directory: tests/fixture/terraform
+      - name: Assert - Verify generated reference and preserved prose
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            const file = 'tests/fixture/terraform/README.md';
+            const text = fs.readFileSync(file, 'utf8');
+            assert.match(text, /This hand-written introduction must survive/);
+            assert.match(text, /Synthetic module input/);
+            assert.match(text, /Synthetic module output/);
+            const nested = 'tests/fixture/terraform/nested/README.md';
+            assert.match(fs.readFileSync(nested, 'utf8'), /Nested module output/);
+            await exec.exec('git', ['add', file, nested]);
+      - name: Act - Regenerate unchanged reference
+        uses: $/actions/terraform/generate-docs
+        with:
+          working-directory: tests/fixture/terraform
+      - name: Assert - Verify idempotence
+        run: git diff --exit-code -- tests/fixture/terraform

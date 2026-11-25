@@ -133,6 +133,12 @@ actually executing the native playbook. Collection sanity owns its own runtime. 
 Galaxy requirements and selected targets. Dependabot maintains upstream action
 pins and the fixture's requirements file. Linting remains in the separate linter workflow.
 
+The Terraform validation action checks tracked modules with backend initialization
+disabled and never runs plan or apply. Its dedicated workflow covers successful
+validation, formatting errors, invalid references and an empty module selection.
+The documentation action's workflow checks generated inputs and outputs, preserved
+prose and idempotence. Fixtures use no cloud providers or credentials.
+
 ## Releases and dependencies
 
 Use Conventional Commits and a reviewed pull request. Publish semantic versions

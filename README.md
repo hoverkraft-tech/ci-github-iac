@@ -44,6 +44,11 @@ Your scenario defines its target environment, inventory, playbooks and test sequ
 Run native module tests with a pinned runtime and consolidated test reports.
 Your repository supplies the module, tests and disposable provider environment.
 
+### Terraform
+
+- [Validate modules](actions/terraform/validate/README.md): check formatting and validate modules without backend access.
+- [Generate documentation](actions/terraform/generate-docs/README.md): inject module references into existing readmes.
+
 ### Virtual machines
 
 #### - [Create VM](actions/vm/create/README.md)
@@ -60,6 +65,11 @@ and publish GitHub summaries, annotations, PR comments and artifacts.
 
 Verify guest deletion before removing its private runtime and SSH keys. Failed
 cleanup remains visible and preserves the runtime for a retry.
+
+## Reusable workflows
+
+- [Terraform CI](.github/workflows/terraform-ci.md) validates module collections on pull requests, main pushes and releases.
+- [Terraform documentation](.github/workflows/terraform-docs.md) updates module references after trusted main-branch CI.
 
 ## Getting started
 
